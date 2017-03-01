@@ -7,644 +7,729 @@
  *
  * License: MIT
  */
-(function(dndLists) {
+(function (dndLists) {
 
-  // In standard-compliant browsers we use a custom mime type and also encode the dnd-type in it.
-  // However, IE and Edge only support a limited number of mime types. The workarounds are described
-  // in https://github.com/marceljuenemann/angular-drag-and-drop-lists/wiki/Data-Transfer-Design
-  var MIME_TYPE = 'application/x-dnd';
-  var EDGE_MIME_TYPE = 'application/json';
-  var MSIE_MIME_TYPE = 'Text';
+    // In standard-compliant browsers we use a custom mime type and also encode the dnd-type in it.
+    // However, IE and Edge only support a limited number of mime types. The workarounds are described
+    // in https://github.com/marceljuenemann/angular-drag-and-drop-lists/wiki/Data-Transfer-Design
+    var MIME_TYPE = 'application/x-dnd';
+    var EDGE_MIME_TYPE = 'application/json';
+    var MSIE_MIME_TYPE = 'Text';
 
-  // All valid HTML5 drop effects, in the order in which we prefer to use them.
-  var ALL_EFFECTS = ['move', 'copy', 'link'];
+    // All valid HTML5 drop effects, in the order in which we prefer to use them.
+    var ALL_EFFECTS = ['move', 'copy', 'link'];
 
-  /**
-   * Use the dnd-draggable attribute to make your element draggable
-   *
-   * Attributes:
-   * - dnd-draggable      Required attribute. The value has to be an object that represents the data
-   *                      of the element. In case of a drag and drop operation the object will be
-   *                      serialized and unserialized on the receiving end.
-   * - dnd-effect-allowed Use this attribute to limit the operations that can be performed. Valid
-   *                      options are "move", "copy" and "link", as well as "all", "copyMove",
-   *                      "copyLink" and "linkMove". The semantics of these operations are up to you
-   *                      and have to be implemented using the callbacks described below. If you
-   *                      allow multiple options, the user can choose between them by using the
-   *                      modifier keys (OS specific). The cursor will be changed accordingly,
-   *                      expect for IE and Edge, where this is not supported.
-   * - dnd-type           Use this attribute if you have different kinds of items in your
-   *                      application and you want to limit which items can be dropped into which
-   *                      lists. Combine with dnd-allowed-types on the dnd-list(s). This attribute
-   *                      must be a lower case string. Upper case characters can be used, but will
-   *                      be converted to lower case automatically.
-   * - dnd-disable-if     You can use this attribute to dynamically disable the draggability of the
-   *                      element. This is useful if you have certain list items that you don't want
-   *                      to be draggable, or if you want to disable drag & drop completely without
-   *                      having two different code branches (e.g. only allow for admins).
-   *
-   * Callbacks:
-   * - dnd-dragstart      Callback that is invoked when the element was dragged. The original
-   *                      dragstart event will be provided in the local event variable.
-   * - dnd-moved          Callback that is invoked when the element was moved. Usually you will
-   *                      remove your element from the original list in this callback, since the
-   *                      directive is not doing that for you automatically. The original dragend
-   *                      event will be provided in the local event variable.
-   * - dnd-copied         Same as dnd-moved, just that it is called when the element was copied
-   *                      instead of moved, so you probably want to implement a different logic.
-   * - dnd-linked         Same as dnd-moved, just that it is called when the element was linked
-   *                      instead of moved, so you probably want to implement a different logic.
-   * - dnd-canceled       Callback that is invoked if the element was dragged, but the operation was
-   *                      canceled and the element was not dropped. The original dragend event will
-   *                      be provided in the local event variable.
-   * - dnd-dragend        Callback that is invoked when the drag operation ended. Available local
-   *                      variables are event and dropEffect.
-   * - dnd-selected       Callback that is invoked when the element was clicked but not dragged.
-   *                      The original click event will be provided in the local event variable.
-   * - dnd-callback       Custom callback that is passed to dropzone callbacks and can be used to
-   *                      communicate between source and target scopes. The dropzone can pass user
-   *                      defined variables to this callback.
-   *
-   * CSS classes:
-   * - dndDragging        This class will be added to the element while the element is being
-   *                      dragged. It will affect both the element you see while dragging and the
-   *                      source element that stays at it's position. Do not try to hide the source
-   *                      element with this class, because that will abort the drag operation.
-   * - dndDraggingSource  This class will be added to the element after the drag operation was
-   *                      started, meaning it only affects the original element that is still at
-   *                      it's source position, and not the "element" that the user is dragging with
-   *                      his mouse pointer.
-   */
-  dndLists.directive('dndDraggable', ['$parse', '$timeout', function($parse, $timeout) {
-    return function(scope, element, attr) {
-      // Set the HTML5 draggable attribute on the element.
-      element.attr("draggable", "true");
+    /**
+     * Use the dnd-draggable attribute to make your element draggable
+     *
+     * Attributes:
+     * - dnd-draggable      Required attribute. The value has to be an object that represents the data
+     *                      of the element. In case of a drag and drop operation the object will be
+     *                      serialized and unserialized on the receiving end.
+     * - dnd-effect-allowed Use this attribute to limit the operations that can be performed. Valid
+     *                      options are "move", "copy" and "link", as well as "all", "copyMove",
+     *                      "copyLink" and "linkMove". The semantics of these operations are up to you
+     *                      and have to be implemented using the callbacks described below. If you
+     *                      allow multiple options, the user can choose between them by using the
+     *                      modifier keys (OS specific). The cursor will be changed accordingly,
+     *                      expect for IE and Edge, where this is not supported.
+     * - dnd-type           Use this attribute if you have different kinds of items in your
+     *                      application and you want to limit which items can be dropped into which
+     *                      lists. Combine with dnd-allowed-types on the dnd-list(s). This attribute
+     *                      must be a lower case string. Upper case characters can be used, but will
+     *                      be converted to lower case automatically.
+     * - dnd-disable-if     You can use this attribute to dynamically disable the draggability of the
+     *                      element. This is useful if you have certain list items that you don't want
+     *                      to be draggable, or if you want to disable drag & drop completely without
+     *                      having two different code branches (e.g. only allow for admins).
+     *
+     * Callbacks:
+     * - dnd-dragstart      Callback that is invoked when the element was dragged. The original
+     *                      dragstart event will be provided in the local event variable.
+     * - dnd-moved          Callback that is invoked when the element was moved. Usually you will
+     *                      remove your element from the original list in this callback, since the
+     *                      directive is not doing that for you automatically. The original dragend
+     *                      event will be provided in the local event variable.
+     * - dnd-copied         Same as dnd-moved, just that it is called when the element was copied
+     *                      instead of moved, so you probably want to implement a different logic.
+     * - dnd-linked         Same as dnd-moved, just that it is called when the element was linked
+     *                      instead of moved, so you probably want to implement a different logic.
+     * - dnd-canceled       Callback that is invoked if the element was dragged, but the operation was
+     *                      canceled and the element was not dropped. The original dragend event will
+     *                      be provided in the local event variable.
+     * - dnd-dragend        Callback that is invoked when the drag operation ended. Available local
+     *                      variables are event and dropEffect.
+     * - dnd-selected       Callback that is invoked when the element was clicked but not dragged.
+     *                      The original click event will be provided in the local event variable.
+     * - dnd-callback       Custom callback that is passed to dropzone callbacks and can be used to
+     *                      communicate between source and target scopes. The dropzone can pass user
+     *                      defined variables to this callback.
+     *
+     * CSS classes:
+     * - dndDragging        This class will be added to the element while the element is being
+     *                      dragged. It will affect both the element you see while dragging and the
+     *                      source element that stays at it's position. Do not try to hide the source
+     *                      element with this class, because that will abort the drag operation.
+     * - dndDraggingSource  This class will be added to the element after the drag operation was
+     *                      started, meaning it only affects the original element that is still at
+     *                      it's source position, and not the "element" that the user is dragging with
+     *                      his mouse pointer.
+     */
+    dndLists.directive('dndDraggable', ['$parse', '$timeout', function ($parse, $timeout) {
+        return function (scope, element, attr) {
+            // Set the HTML5 draggable attribute on the element.
+            element.attr("draggable", "true");
 
-      // If the dnd-disable-if attribute is set, we have to watch that.
-      if (attr.dndDisableIf) {
-        scope.$watch(attr.dndDisableIf, function(disabled) {
-          element.attr("draggable", !disabled);
-        });
-      }
-
-      /**
-       * When the drag operation is started we have to prepare the dataTransfer object,
-       * which is the primary way we communicate with the target element
-       */
-      element.on('dragstart', function(event) {
-        event = event.originalEvent || event;
-
-        // Check whether the element is draggable, since dragstart might be triggered on a child.
-        if (element.attr('draggable') == 'false') return true;
-
-        // Initialize global state.
-        dndState.isDragging = true;
-        dndState.itemType = attr.dndType && scope.$eval(attr.dndType).toLowerCase();
-
-        // Set the allowed drop effects. See below for special IE handling.
-        dndState.dropEffect = "none";
-        dndState.effectAllowed = attr.dndEffectAllowed || ALL_EFFECTS[0];
-        event.dataTransfer.effectAllowed = dndState.effectAllowed;
-
-        // Internet Explorer and Microsoft Edge don't support custom mime types, see design doc:
-        // https://github.com/marceljuenemann/angular-drag-and-drop-lists/wiki/Data-Transfer-Design
-        var item = scope.$eval(attr.dndDraggable);
-        var mimeType = MIME_TYPE + (dndState.itemType ? ('-' + dndState.itemType) : '');
-        try {
-          event.dataTransfer.setData(mimeType, angular.toJson(item));
-        } catch (e) {
-          // Setting a custom MIME type did not work, we are probably in IE or Edge.
-          var data = angular.toJson({item: item, type: dndState.itemType});
-          try {
-            event.dataTransfer.setData(EDGE_MIME_TYPE, data);
-          } catch (e) {
-            // We are in Internet Explorer and can only use the Text MIME type. Also note that IE
-            // does not allow changing the cursor in the dragover event, therefore we have to choose
-            // the one we want to display now by setting effectAllowed.
-            var effectsAllowed = filterEffects(ALL_EFFECTS, dndState.effectAllowed);
-            event.dataTransfer.effectAllowed = effectsAllowed[0];
-            event.dataTransfer.setData(MSIE_MIME_TYPE, data);
-          }
-        }
-
-        // Add CSS classes. See documentation above.
-        element.addClass("dndDragging");
-        $timeout(function() { element.addClass("dndDraggingSource"); }, 0);
-
-        // Try setting a proper drag image if triggered on a dnd-handle (won't work in IE).
-        if (event._dndHandle && event.dataTransfer.setDragImage) {
-          event.dataTransfer.setDragImage(element[0], 0, 0);
-        }
-
-        // Invoke dragstart callback and prepare extra callback for dropzone.
-        $parse(attr.dndDragstart)(scope, {event: event});
-        if (attr.dndCallback) {
-          var callback = $parse(attr.dndCallback);
-          dndState.callback = function(params) { return callback(scope, params || {}); };
-        }
-
-        event.stopPropagation();
-      });
-
-      /**
-       * The dragend event is triggered when the element was dropped or when the drag
-       * operation was aborted (e.g. hit escape button). Depending on the executed action
-       * we will invoke the callbacks specified with the dnd-moved or dnd-copied attribute.
-       */
-      element.on('dragend', function(event) {
-        event = event.originalEvent || event;
-
-        // Invoke callbacks. Usually we would use event.dataTransfer.dropEffect to determine
-        // the used effect, but Chrome has not implemented that field correctly. On Windows
-        // it always sets it to 'none', while Chrome on Linux sometimes sets it to something
-        // else when it's supposed to send 'none' (drag operation aborted).
-        scope.$apply(function() {
-          var dropEffect = dndState.dropEffect;
-          var cb = {copy: 'dndCopied', link: 'dndLinked', move: 'dndMoved', none: 'dndCanceled'};
-          $parse(attr[cb[dropEffect]])(scope, {event: event});
-          $parse(attr.dndDragend)(scope, {event: event, dropEffect: dropEffect});
-        });
-
-        // Clean up
-        dndState.isDragging = false;
-        dndState.callback = undefined;
-        element.removeClass("dndDragging");
-        element.removeClass("dndDraggingSource");
-        event.stopPropagation();
-
-        // In IE9 it is possible that the timeout from dragstart triggers after the dragend handler.
-        $timeout(function() { element.removeClass("dndDraggingSource"); }, 0);
-      });
-
-      /**
-       * When the element is clicked we invoke the callback function
-       * specified with the dnd-selected attribute.
-       */
-      element.on('click', function(event) {
-        if (!attr.dndSelected) return;
-
-        event = event.originalEvent || event;
-        scope.$apply(function() {
-          $parse(attr.dndSelected)(scope, {event: event});
-        });
-
-        // Prevent triggering dndSelected in parent elements.
-        event.stopPropagation();
-      });
-
-      /**
-       * Workaround to make element draggable in IE9
-       */
-      element.on('selectstart', function() {
-        if (this.dragDrop) this.dragDrop();
-      });
-    };
-  }]);
-
-  /**
-   * Use the dnd-list attribute to make your list element a dropzone. Usually you will add a single
-   * li element as child with the ng-repeat directive. If you don't do that, we will not be able to
-   * position the dropped element correctly. If you want your list to be sortable, also add the
-   * dnd-draggable directive to your li element(s).
-   *
-   * Attributes:
-   * - dnd-list             Required attribute. The value has to be the array in which the data of
-   *                        the dropped element should be inserted. The value can be blank if used
-   *                        with a custom dnd-drop handler that always returns true.
-   * - dnd-allowed-types    Optional array of allowed item types. When used, only items that had a
-   *                        matching dnd-type attribute will be dropable. Upper case characters will
-   *                        automatically be converted to lower case.
-   * - dnd-effect-allowed   Optional string expression that limits the drop effects that can be
-   *                        performed in the list. See dnd-effect-allowed on dnd-draggable for more
-   *                        details on allowed options. The default value is all.
-   * - dnd-disable-if       Optional boolean expresssion. When it evaluates to true, no dropping
-   *                        into the list is possible. Note that this also disables rearranging
-   *                        items inside the list.
-   * - dnd-horizontal-list  Optional boolean expresssion. When it evaluates to true, the positioning
-   *                        algorithm will use the left and right halfs of the list items instead of
-   *                        the upper and lower halfs.
-   * - dnd-external-sources Optional boolean expression. When it evaluates to true, the list accepts
-   *                        drops from sources outside of the current browser tab. This allows to
-   *                        drag and drop accross different browser tabs. The only major browser
-   *                        that does not support this is currently Microsoft Edge.
-   *
-   * Callbacks:
-   * - dnd-dragover         Optional expression that is invoked when an element is dragged over the
-   *                        list. If the expression is set, but does not return true, the element is
-   *                        not allowed to be dropped. The following variables will be available:
-   *                        - event: The original dragover event sent by the browser.
-   *                        - index: The position in the list at which the element would be dropped.
-   *                        - type: The dnd-type set on the dnd-draggable, or undefined if non was
-   *                          set. Will be null for drops from external sources in IE and Edge,
-   *                          since we don't know the type in those cases.
-   *                        - dropEffect: One of move, copy or link, see dnd-effect-allowed.
-   *                        - external: Whether the element was dragged from an external source.
-   *                        - callback: If dnd-callback was set on the source element, this is a
-   *                          function reference to the callback. The callback can be invoked with
-   *                          custom variables like this: callback({var1: value1, var2: value2}).
-   *                          The callback will be executed on the scope of the source element. If
-   *                          dnd-external-sources was set and external is true, this callback will
-   *                          not be available.
-   * - dnd-drop             Optional expression that is invoked when an element is dropped on the
-   *                        list. The same variables as for dnd-dragover will be available, with the
-   *                        exception that type is always known and therefore never null. There
-   *                        will also be an item variable, which is the transferred object. The
-   *                        return value determines the further handling of the drop:
-   *                        - falsy: The drop will be canceled and the element won't be inserted.
-   *                        - true: Signalises that the drop is allowed, but the dnd-drop
-   *                          callback already took care of inserting the element.
-   *                        - otherwise: All other return values will be treated as the object to
-   *                          insert into the array. In most cases you want to simply return the
-   *                          item parameter, but there are no restrictions on what you can return.
-   * - dnd-inserted         Optional expression that is invoked after a drop if the element was
-   *                        actually inserted into the list. The same local variables as for
-   *                        dnd-drop will be available. Note that for reorderings inside the same
-   *                        list the old element will still be in the list due to the fact that
-   *                        dnd-moved was not called yet.
-   *
-   * CSS classes:
-   * - dndPlaceholder       When an element is dragged over the list, a new placeholder child
-   *                        element will be added. This element is of type li and has the class
-   *                        dndPlaceholder set. Alternatively, you can define your own placeholder
-   *                        by creating a child element with dndPlaceholder class.
-   * - dndDragover          Will be added to the list while an element is dragged over the list.
-   */
-  dndLists.directive('dndList', ['$parse', function($parse) {
-    return function(scope, element, attr) {
-      // While an element is dragged over the list, this placeholder element is inserted
-      // at the location where the element would be inserted after dropping.
-      var placeholder = getPlaceholderElement();
-      placeholder.remove();
-
-      var placeholderNode = placeholder[0];
-      var listNode = element[0];
-      var listSettings = {};
-
-      /**
-       * The dragenter event is fired when a dragged element or text selection enters a valid drop
-       * target. According to the spec, we either need to have a dropzone attribute or listen on
-       * dragenter events and call preventDefault(). It should be noted though that no browser seems
-       * to enforce this behaviour.
-       */
-      element.on('dragenter', function (event) {
-        event = event.originalEvent || event;
-
-        // Calculate list properties, so that we don't have to repeat this on every dragover event.
-        var types = attr.dndAllowedTypes && scope.$eval(attr.dndAllowedTypes);
-        listSettings = {
-          allowedTypes: angular.isArray(types) && types.join('|').toLowerCase().split('|'),
-          disabled: attr.dndDisableIf && scope.$eval(attr.dndDisableIf),
-          externalSources: attr.dndExternalSources && scope.$eval(attr.dndExternalSources),
-          horizontal: attr.dndHorizontalList && scope.$eval(attr.dndHorizontalList)
-        };
-
-        var mimeType = getMimeType(event.dataTransfer.types);
-        if (!mimeType || !isDropAllowed(getItemType(mimeType))) return true;
-        event.preventDefault();
-      });
-
-      /**
-       * The dragover event is triggered "every few hundred milliseconds" while an element
-       * is being dragged over our list, or over an child element.
-       */
-      element.on('dragover', function(event) {
-        event = event.originalEvent || event;
-
-        // Check whether the drop is allowed and determine mime type.
-        var mimeType = getMimeType(event.dataTransfer.types);
-        var itemType = getItemType(mimeType);
-        if (!mimeType || !isDropAllowed(itemType)) return true;
-
-        // Make sure the placeholder is shown, which is especially important if the list is empty.
-        if (placeholderNode.parentNode != listNode) {
-          element.append(placeholder);
-        }
-
-        if (event.target != listNode) {
-          // Try to find the node direct directly below the list node.
-          var listItemNode = event.target;
-          while (listItemNode.parentNode != listNode && listItemNode.parentNode) {
-            listItemNode = listItemNode.parentNode;
-          }
-
-          if (listItemNode.parentNode == listNode && listItemNode != placeholderNode) {
-            // If the mouse pointer is in the upper half of the list item element,
-            // we position the placeholder before the list item, otherwise after it.
-            var rect = listItemNode.getBoundingClientRect();
-            if (listSettings.horizontal) {
-              var isFirstHalf = event.clientX < rect.left + rect.width / 2;
-            } else {
-              var isFirstHalf = event.clientY < rect.top + rect.height / 2;
+            // If the dnd-disable-if attribute is set, we have to watch that.
+            if (attr.dndDisableIf) {
+                scope.$watch(attr.dndDisableIf, function (disabled) {
+                    element.attr("draggable", !disabled);
+                });
             }
-            listNode.insertBefore(placeholderNode,
-                isFirstHalf ? listItemNode : listItemNode.nextSibling);
-          }
-        }
 
-        // In IE we set a fake effectAllowed in dragstart to get the correct cursor, we therefore
-        // ignore the effectAllowed passed in dataTransfer. We must also not access dataTransfer for
-        // drops from external sources, as that throws an exception.
-        var ignoreDataTransfer = mimeType == MSIE_MIME_TYPE;
-        var dropEffect = getDropEffect(event, ignoreDataTransfer);
-        if (dropEffect == 'none') return stopDragover();
+            function getImageForType(type) {
+                switch (type) {
+                    case "csv":
+                        return "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJDYXBhXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNTYgNTYiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDU2IDU2OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0U5RTlFMDsiIGQ9Ik0zNi45ODUsMEg3Ljk2M0M3LjE1NSwwLDYuNSwwLjY1NSw2LjUsMS45MjZWNTVjMCwwLjM0NSwwLjY1NSwxLDEuNDYzLDFoNDAuMDc0YzAuODA4LDAsMS40NjMtMC42NTUsMS40NjMtMVYxMi45NzhjMC0wLjY5Ni0wLjA5My0wLjkyLTAuMjU3LTEuMDg1TDM3LjYwNywwLjI1N0MzNy40NDIsMC4wOTMsMzcuMjE4LDAsMzYuOTg1LDB6Ii8+PHBvbHlnb24gc3R5bGU9ImZpbGw6I0Q5RDdDQTsiIHBvaW50cz0iMzcuNSwwLjE1MSAzNy41LDEyIDQ5LjM0OSwxMiAiLz48cGF0aCBzdHlsZT0iZmlsbDojRjM2RkEwOyIgZD0iTTQ4LjAzNyw1Nkg3Ljk2M0M3LjE1NSw1Niw2LjUsNTUuMzQ1LDYuNSw1NC41MzdWMzloNDN2MTUuNTM3QzQ5LjUsNTUuMzQ1LDQ4Ljg0NSw1Niw0OC4wMzcsNTZ6Ii8+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0yMS41OCw1MS45NzVjLTAuMzc0LDAuMzY0LTAuNzk4LDAuNjM4LTEuMjcxLDAuODJjLTAuNDc0LDAuMTgzLTAuOTg0LDAuMjczLTEuNTMxLDAuMjczYy0wLjYwMiwwLTEuMTU1LTAuMTA5LTEuNjYxLTAuMzI4cy0wLjk0OC0wLjU0Mi0xLjMyNi0wLjk3MWMtMC4zNzgtMC40MjktMC42NzUtMC45NjYtMC44ODktMS42MTNjLTAuMjE0LTAuNjQ3LTAuMzIxLTEuMzk1LTAuMzIxLTIuMjQyczAuMTA3LTEuNTkzLDAuMzIxLTIuMjM1YzAuMjE0LTAuNjQzLDAuNTEtMS4xNzgsMC44ODktMS42MDZjMC4zNzgtMC40MjksMC44MjItMC43NTQsMS4zMzMtMC45NzhjMC41MS0wLjIyNCwxLjA2Mi0wLjMzNSwxLjY1NC0wLjMzNWMwLjU0NywwLDEuMDU3LDAuMDkxLDEuNTMxLDAuMjczYzAuNDc0LDAuMTgzLDAuODk3LDAuNDU2LDEuMjcxLDAuODJsLTEuMTM1LDEuMDEyYy0wLjIyOC0wLjI2NS0wLjQ4MS0wLjQ1Ni0wLjc1OS0wLjU3NGMtMC4yNzgtMC4xMTgtMC41NjctMC4xNzgtMC44NjgtMC4xNzhjLTAuMzM3LDAtMC42NTksMC4wNjMtMC45NjQsMC4xOTFjLTAuMzA2LDAuMTI4LTAuNTc5LDAuMzQ0LTAuODIsMC42NDljLTAuMjQyLDAuMzA2LTAuNDMxLDAuNjk5LTAuNTY3LDEuMTgzcy0wLjIxLDEuMDc1LTAuMjE5LDEuNzc3YzAuMDA5LDAuNjg0LDAuMDgsMS4yNjcsMC4yMTIsMS43NWMwLjEzMiwwLjQ4MywwLjMxNCwwLjg3NywwLjU0NywxLjE4M3MwLjQ5NywwLjUyOCwwLjc5MywwLjY3YzAuMjk2LDAuMTQyLDAuNjA4LDAuMjEyLDAuOTM3LDAuMjEyczAuNjM2LTAuMDYsMC45MjMtMC4xNzhzMC41NDktMC4zMSwwLjc4Ni0wLjU3NEwyMS41OCw1MS45NzV6Ii8+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0yOS42MzMsNTAuMjM4YzAsMC4zNjQtMC4wNzUsMC43MTgtMC4yMjYsMS4wNnMtMC4zNjIsMC42NDMtMC42MzYsMC45MDJzLTAuNjExLDAuNDY3LTEuMDEyLDAuNjIyYy0wLjQwMSwwLjE1NS0wLjg1NywwLjIzMi0xLjM2NywwLjIzMmMtMC4yMTksMC0wLjQ0NC0wLjAxMi0wLjY3Ny0wLjAzNHMtMC40NjctMC4wNjItMC43MDQtMC4xMTZjLTAuMjM3LTAuMDU1LTAuNDYzLTAuMTMtMC42NzctMC4yMjZjLTAuMjE0LTAuMDk2LTAuMzk5LTAuMjEyLTAuNTU0LTAuMzQ5bDAuMjg3LTEuMTc2YzAuMTI3LDAuMDczLDAuMjg5LDAuMTQ0LDAuNDg1LDAuMjEyYzAuMTk2LDAuMDY4LDAuMzk4LDAuMTMyLDAuNjA4LDAuMTkxYzAuMjA5LDAuMDYsMC40MTksMC4xMDcsMC42MjksMC4xNDRjMC4yMDksMC4wMzYsMC40MDUsMC4wNTUsMC41ODgsMC4wNTVjMC41NTYsMCwwLjk4Mi0wLjEzLDEuMjc4LTAuMzljMC4yOTYtMC4yNiwwLjQ0NC0wLjY0NSwwLjQ0NC0xLjE1NWMwLTAuMzEtMC4xMDUtMC41NzQtMC4zMTQtMC43OTNjLTAuMjEtMC4yMTktMC40NzItMC40MTctMC43ODYtMC41OTVzLTAuNjU0LTAuMzU1LTEuMDE5LTAuNTMzYy0wLjM2NS0wLjE3OC0wLjcwNy0wLjM4OC0xLjAyNS0wLjYyOWMtMC4zMTktMC4yNDEtMC41ODMtMC41MjYtMC43OTMtMC44NTRjLTAuMjEtMC4zMjgtMC4zMTQtMC43MzgtMC4zMTQtMS4yM2MwLTAuNDQ2LDAuMDgyLTAuODQzLDAuMjQ2LTEuMTg5czAuMzg1LTAuNjQxLDAuNjYzLTAuODgyYzAuMjc4LTAuMjQxLDAuNjAyLTAuNDI2LDAuOTcxLTAuNTU0czAuNzU5LTAuMTkxLDEuMTY5LTAuMTkxYzAuNDE5LDAsMC44NDMsMC4wMzksMS4yNzEsMC4xMTZjMC40MjgsMC4wNzcsMC43NzQsMC4yMDMsMS4wMzksMC4zNzZjLTAuMDU1LDAuMTE4LTAuMTE5LDAuMjQ4LTAuMTkxLDAuMzljLTAuMDczLDAuMTQyLTAuMTQyLDAuMjczLTAuMjA1LDAuMzk2Yy0wLjA2NCwwLjEyMy0wLjExOSwwLjIyNi0wLjE2NCwwLjMwOGMtMC4wNDYsMC4wODItMC4wNzMsMC4xMjgtMC4wODIsMC4xMzdjLTAuMDU1LTAuMDI3LTAuMTE2LTAuMDYzLTAuMTg1LTAuMTA5cy0wLjE2Ny0wLjA5MS0wLjI5NC0wLjEzN2MtMC4xMjgtMC4wNDYtMC4yOTYtMC4wNzctMC41MDYtMC4wOTZjLTAuMjEtMC4wMTktMC40NzktMC4wMTQtMC44MDcsMC4wMTRjLTAuMTgzLDAuMDE5LTAuMzU1LDAuMDctMC41MiwwLjE1N3MtMC4zMSwwLjE5My0wLjQzOCwwLjMyMWMtMC4xMjgsMC4xMjgtMC4yMjgsMC4yNzEtMC4zMDEsMC40MzFjLTAuMDczLDAuMTU5LTAuMTA5LDAuMzEzLTAuMTA5LDAuNDU4YzAsMC4zNjQsMC4xMDQsMC42NTgsMC4zMTQsMC44ODJjMC4yMDksMC4yMjQsMC40NjksMC40MTksMC43NzksMC41ODhjMC4zMSwwLjE2OSwwLjY0NywwLjMzMywxLjAxMiwwLjQ5MmMwLjM2NCwwLjE1OSwwLjcwNCwwLjM1NCwxLjAxOSwwLjU4MXMwLjU3NiwwLjUxMywwLjc4NiwwLjg1NEMyOS41MjgsNDkuMjYxLDI5LjYzMyw0OS43LDI5LjYzMyw1MC4yMzh6Ii8+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0zNC4wMzUsNTMuMDU1bC0zLjEzMS0xMC4xMzFoMS44NzNsMi4zMzgsOC42OTVsMi40NzUtOC42OTVoMS44NTlsLTMuMjgxLDEwLjEzMUgzNC4wMzV6Ii8+PC9nPjxwYXRoIHN0eWxlPSJmaWxsOiNDOEJEQjg7IiBkPSJNMjMuNSwxNnYtNGgtMTJ2NHYydjJ2MnYydjJ2MnYydjRoMTBoMmgyMXYtNHYtMnYtMnYtMnYtMnYtMnYtNEgyMy41eiBNMTMuNSwxNGg4djJoLThWMTR6IE0xMy41LDE4aDh2MmgtOFYxOHogTTEzLjUsMjJoOHYyaC04VjIyeiBNMTMuNSwyNmg4djJoLThWMjZ6IE0yMS41LDMyaC04di0yaDhWMzJ6IE00Mi41LDMyaC0xOXYtMmgxOVYzMnogTTQyLjUsMjhoLTE5di0yaDE5VjI4eiBNNDIuNSwyNGgtMTl2LTJoMTlWMjR6IE0yMy41LDIwdi0yaDE5djJIMjMuNXoiLz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PC9zdmc+";
+                        break;
+                    case "doc":
+                    case "docx":
+                    case "odt":
+                        return "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJDYXBhXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNTYgNTYiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDU2IDU2OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0U5RTlFMDsiIGQ9Ik0zNi45ODUsMEg3Ljk2M0M3LjE1NSwwLDYuNSwwLjY1NSw2LjUsMS45MjZWNTVjMCwwLjM0NSwwLjY1NSwxLDEuNDYzLDFoNDAuMDc0YzAuODA4LDAsMS40NjMtMC42NTUsMS40NjMtMVYxMi45NzhjMC0wLjY5Ni0wLjA5My0wLjkyLTAuMjU3LTEuMDg1TDM3LjYwNywwLjI1N0MzNy40NDIsMC4wOTMsMzcuMjE4LDAsMzYuOTg1LDB6Ii8+PHBvbHlnb24gc3R5bGU9ImZpbGw6I0Q5RDdDQTsiIHBvaW50cz0iMzcuNSwwLjE1MSAzNy41LDEyIDQ5LjM0OSwxMiAiLz48cGF0aCBzdHlsZT0iZmlsbDojODY5N0NCOyIgZD0iTTE4LjUsMTNoLTZjLTAuNTUyLDAtMS0wLjQ0OC0xLTFzMC40NDgtMSwxLTFoNmMwLjU1MiwwLDEsMC40NDgsMSwxUzE5LjA1MiwxMywxOC41LDEzeiIvPjxwYXRoIHN0eWxlPSJmaWxsOiM4Njk3Q0I7IiBkPSJNMjEuNSwxOGgtOWMtMC41NTIsMC0xLTAuNDQ4LTEtMXMwLjQ0OC0xLDEtMWg5YzAuNTUyLDAsMSwwLjQ0OCwxLDFTMjIuMDUyLDE4LDIxLjUsMTh6Ii8+PHBhdGggc3R5bGU9ImZpbGw6Izg2OTdDQjsiIGQ9Ik0yNS41LDE4Yy0wLjI2LDAtMC41Mi0wLjExLTAuNzEtMC4yOWMtMC4xOC0wLjE5LTAuMjktMC40NS0wLjI5LTAuNzFjMC0wLjI2LDAuMTEtMC41MiwwLjI5LTAuNzFjMC4zNy0wLjM3LDEuMDUtMC4zNywxLjQyLDBjMC4xOCwwLjE5LDAuMjksMC40NSwwLjI5LDAuNzFjMCwwLjI2LTAuMTEsMC41Mi0wLjI5LDAuNzFDMjYuMDIsMTcuODksMjUuNzYsMTgsMjUuNSwxOHoiLz48cGF0aCBzdHlsZT0iZmlsbDojODY5N0NCOyIgZD0iTTM3LjUsMThoLThjLTAuNTUyLDAtMS0wLjQ0OC0xLTFzMC40NDgtMSwxLTFoOGMwLjU1MiwwLDEsMC40NDgsMSwxUzM4LjA1MiwxOCwzNy41LDE4eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiM4Njk3Q0I7IiBkPSJNMTIuNSwzM2MtMC4yNiwwLTAuNTItMC4xMS0wLjcxLTAuMjljLTAuMTgtMC4xOS0wLjI5LTAuNDUtMC4yOS0wLjcxYzAtMC4yNiwwLjExLTAuNTIsMC4yOS0wLjcxYzAuMzctMC4zNywxLjA1LTAuMzcsMS40MiwwYzAuMTgsMC4xOSwwLjI5LDAuNDQsMC4yOSwwLjcxYzAsMC4yNi0wLjExLDAuNTItMC4yOSwwLjcxQzEzLjAyLDMyLjg5LDEyLjc2LDMzLDEyLjUsMzN6Ii8+PHBhdGggc3R5bGU9ImZpbGw6Izg2OTdDQjsiIGQ9Ik0yNC41LDMzaC04Yy0wLjU1MiwwLTEtMC40NDgtMS0xczAuNDQ4LTEsMS0xaDhjMC41NTIsMCwxLDAuNDQ4LDEsMVMyNS4wNTIsMzMsMjQuNSwzM3oiLz48cGF0aCBzdHlsZT0iZmlsbDojODY5N0NCOyIgZD0iTTQzLjUsMThoLTJjLTAuNTUyLDAtMS0wLjQ0OC0xLTFzMC40NDgtMSwxLTFoMmMwLjU1MiwwLDEsMC40NDgsMSwxUzQ0LjA1MiwxOCw0My41LDE4eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiM4Njk3Q0I7IiBkPSJNMzQuNSwyM2gtMjJjLTAuNTUyLDAtMS0wLjQ0OC0xLTFzMC40NDgtMSwxLTFoMjJjMC41NTIsMCwxLDAuNDQ4LDEsMVMzNS4wNTIsMjMsMzQuNSwyM3oiLz48cGF0aCBzdHlsZT0iZmlsbDojODY5N0NCOyIgZD0iTTQzLjUsMjNoLTZjLTAuNTUyLDAtMS0wLjQ0OC0xLTFzMC40NDgtMSwxLTFoNmMwLjU1MiwwLDEsMC40NDgsMSwxUzQ0LjA1MiwyMyw0My41LDIzeiIvPjxwYXRoIHN0eWxlPSJmaWxsOiM4Njk3Q0I7IiBkPSJNMTYuNSwyOGgtNGMtMC41NTIsMC0xLTAuNDQ4LTEtMXMwLjQ0OC0xLDEtMWg0YzAuNTUyLDAsMSwwLjQ0OCwxLDFTMTcuMDUyLDI4LDE2LjUsMjh6Ii8+PHBhdGggc3R5bGU9ImZpbGw6Izg2OTdDQjsiIGQ9Ik0zMC41LDI4aC0xMGMtMC41NTIsMC0xLTAuNDQ4LTEtMXMwLjQ0OC0xLDEtMWgxMGMwLjU1MiwwLDEsMC40NDgsMSwxUzMxLjA1MiwyOCwzMC41LDI4eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiM4Njk3Q0I7IiBkPSJNNDMuNSwyOGgtOWMtMC41NTIsMC0xLTAuNDQ4LTEtMXMwLjQ0OC0xLDEtMWg5YzAuNTUyLDAsMSwwLjQ0OCwxLDFTNDQuMDUyLDI4LDQzLjUsMjh6Ii8+PHBhdGggc3R5bGU9ImZpbGw6IzAwOTZFNjsiIGQ9Ik00OC4wMzcsNTZINy45NjNDNy4xNTUsNTYsNi41LDU1LjM0NSw2LjUsNTQuNTM3VjM5aDQzdjE1LjUzN0M0OS41LDU1LjM0NSw0OC44NDUsNTYsNDguMDM3LDU2eiIvPjxnPjxwYXRoIHN0eWxlPSJmaWxsOiNGRkZGRkY7IiBkPSJNMjMuNSw0Ny42ODJjMCwwLjgyOS0wLjA4OSwxLjUzOC0wLjI2NywyLjEyNnMtMC40MDMsMS4wOC0wLjY3NywxLjQ3N3MtMC41ODEsMC43MDktMC45MjMsMC45MzdzLTAuNjcyLDAuMzk4LTAuOTkxLDAuNTEzYy0wLjMxOSwwLjExNC0wLjYxMSwwLjE4Ny0wLjg3NSwwLjIxOUMxOS41MDMsNTIuOTg0LDE5LjMwNyw1MywxOS4xOCw1M2gtMy44MTRWNDIuOTI0SDE4LjRjMC44NDgsMCwxLjU5MywwLjEzNSwyLjIzNSwwLjQwM3MxLjE3NiwwLjYyNywxLjYsMS4wNzNzMC43NCwwLjk1NSwwLjk1LDEuNTI0QzIzLjM5NSw0Ni40OTQsMjMuNSw0Ny4wOCwyMy41LDQ3LjY4MnogTTE4LjYzMyw1MS43OTdjMS4xMTIsMCwxLjkxNC0wLjM1NSwyLjQwNi0xLjA2NnMwLjczOC0xLjc0MSwwLjczOC0zLjA5YzAtMC40MTktMC4wNS0wLjgzNC0wLjE1LTEuMjQ0Yy0wLjEwMS0wLjQxLTAuMjk0LTAuNzgxLTAuNTgxLTEuMTE0cy0wLjY3Ny0wLjYwMi0xLjE2OS0wLjgwN3MtMS4xMy0wLjMwOC0xLjkxNC0wLjMwOGgtMC45NTd2Ny42MjlIMTguNjMzeiIvPjxwYXRoIHN0eWxlPSJmaWxsOiNGRkZGRkY7IiBkPSJNMzMuNDc1LDQ3LjkxNGMwLDAuODQ4LTAuMTA3LDEuNTk1LTAuMzIxLDIuMjQyYy0wLjIxNCwwLjY0Ny0wLjUxMSwxLjE4NS0wLjg4OSwxLjYxM2MtMC4zNzgsMC40MjktMC44MiwwLjc1Mi0xLjMyNiwwLjk3MXMtMS4wNiwwLjMyOC0xLjY2MSwwLjMyOHMtMS4xNTUtMC4xMDktMS42NjEtMC4zMjhzLTAuOTQ4LTAuNTQyLTEuMzI2LTAuOTcxYy0wLjM3OC0wLjQyOS0wLjY3NS0wLjk2Ni0wLjg4OS0xLjYxM2MtMC4yMTQtMC42NDctMC4zMjEtMS4zOTUtMC4zMjEtMi4yNDJzMC4xMDctMS41OTMsMC4zMjEtMi4yMzVjMC4yMTQtMC42NDMsMC41MS0xLjE3OCwwLjg4OS0xLjYwNmMwLjM3OC0wLjQyOSwwLjgyLTAuNzU0LDEuMzI2LTAuOTc4czEuMDYtMC4zMzUsMS42NjEtMC4zMzVzMS4xNTUsMC4xMTEsMS42NjEsMC4zMzVzMC45NDgsMC41NDksMS4zMjYsMC45NzhjMC4zNzgsMC40MjksMC42NzQsMC45NjQsMC44ODksMS42MDZDMzMuMzY3LDQ2LjMyMSwzMy40NzUsNDcuMDY2LDMzLjQ3NSw0Ny45MTR6IE0yOS4yMzYsNTEuNzI5YzAuMzM3LDAsMC42NTgtMC4wNjYsMC45NjQtMC4xOThjMC4zMDUtMC4xMzIsMC41NzktMC4zNDksMC44Mi0wLjY0OWMwLjI0MS0wLjMwMSwwLjQzMS0wLjY5NSwwLjU2Ny0xLjE4M3MwLjIwOS0xLjA4MiwwLjIxOS0xLjc4NGMtMC4wMDktMC42ODQtMC4wOC0xLjI2NS0wLjIxMi0xLjc0M2MtMC4xMzItMC40NzktMC4zMTQtMC44NzMtMC41NDctMS4xODNzLTAuNDk3LTAuNTMzLTAuNzkzLTAuNjdjLTAuMjk2LTAuMTM3LTAuNjA4LTAuMjA1LTAuOTM3LTAuMjA1Yy0wLjMzNywwLTAuNjU5LDAuMDYzLTAuOTY0LDAuMTkxYy0wLjMwNiwwLjEyOC0wLjU3OSwwLjM0NC0wLjgyLDAuNjQ5Yy0wLjI0MiwwLjMwNi0wLjQzMSwwLjY5OS0wLjU2NywxLjE4M3MtMC4yMSwxLjA3NS0wLjIxOSwxLjc3N2MwLjAwOSwwLjY4NCwwLjA4LDEuMjY3LDAuMjEyLDEuNzVjMC4xMzIsMC40ODMsMC4zMTQsMC44NzcsMC41NDcsMS4xODNzMC40OTcsMC41MjgsMC43OTMsMC42N0MyOC41OTYsNTEuNjU4LDI4LjkwOCw1MS43MjksMjkuMjM2LDUxLjcyOXoiLz48cGF0aCBzdHlsZT0iZmlsbDojRkZGRkZGOyIgZD0iTTQyLjYwNyw1MS45NzVjLTAuMzc0LDAuMzY0LTAuNzk4LDAuNjM4LTEuMjcxLDAuODJjLTAuNDc0LDAuMTgzLTAuOTg0LDAuMjczLTEuNTMxLDAuMjczYy0wLjYwMiwwLTEuMTU1LTAuMTA5LTEuNjYxLTAuMzI4cy0wLjk0OC0wLjU0Mi0xLjMyNi0wLjk3MWMtMC4zNzgtMC40MjktMC42NzUtMC45NjYtMC44ODktMS42MTNjLTAuMjE0LTAuNjQ3LTAuMzIxLTEuMzk1LTAuMzIxLTIuMjQyczAuMTA3LTEuNTkzLDAuMzIxLTIuMjM1YzAuMjE0LTAuNjQzLDAuNTEtMS4xNzgsMC44ODktMS42MDZjMC4zNzgtMC40MjksMC44MjItMC43NTQsMS4zMzMtMC45NzhjMC41MS0wLjIyNCwxLjA2Mi0wLjMzNSwxLjY1NC0wLjMzNWMwLjU0NywwLDEuMDU3LDAuMDkxLDEuNTMxLDAuMjczYzAuNDc0LDAuMTgzLDAuODk3LDAuNDU2LDEuMjcxLDAuODJsLTEuMTM1LDEuMDEyYy0wLjIyOC0wLjI2NS0wLjQ4MS0wLjQ1Ni0wLjc1OS0wLjU3NGMtMC4yNzgtMC4xMTgtMC41NjctMC4xNzgtMC44NjgtMC4xNzhjLTAuMzM3LDAtMC42NTksMC4wNjMtMC45NjQsMC4xOTFjLTAuMzA2LDAuMTI4LTAuNTc5LDAuMzQ0LTAuODIsMC42NDljLTAuMjQyLDAuMzA2LTAuNDMxLDAuNjk5LTAuNTY3LDEuMTgzcy0wLjIxLDEuMDc1LTAuMjE5LDEuNzc3YzAuMDA5LDAuNjg0LDAuMDgsMS4yNjcsMC4yMTIsMS43NWMwLjEzMiwwLjQ4MywwLjMxNCwwLjg3NywwLjU0NywxLjE4M3MwLjQ5NywwLjUyOCwwLjc5MywwLjY3YzAuMjk2LDAuMTQyLDAuNjA4LDAuMjEyLDAuOTM3LDAuMjEyczAuNjM2LTAuMDYsMC45MjMtMC4xNzhzMC41NDktMC4zMSwwLjc4Ni0wLjU3NEw0Mi42MDcsNTEuOTc1eiIvPjwvZz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PC9zdmc+";
+                        break;
+                    case "folder":
+                        return "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/PjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iQ2FwYV8xIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHhtbG5zOnhsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIiB4PSIwcHgiIHk9IjBweCIgdmlld0JveD0iMCAwIDU4IDU4IiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCA1OCA1ODsiIHhtbDpzcGFjZT0icHJlc2VydmUiPjxwYXRoIHN0eWxlPSJmaWxsOiNFRkNFNEE7IiBkPSJNNDYuMzI0LDUyLjVIMS41NjVjLTEuMDMsMC0xLjc3OS0wLjk3OC0xLjUxLTEuOTczbDEwLjE2Ni0yNy44NzFjMC4xODQtMC42ODIsMC44MDMtMS4xNTYsMS41MS0xLjE1Nkg1Ni40OWMxLjAzLDAsMS41MSwwLjk4NCwxLjUxLDEuOTczTDQ3LjgzNCw1MS4zNDRDNDcuNjUsNTIuMDI2LDQ3LjAzMSw1Mi41LDQ2LjMyNCw1Mi41eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiNGNEVGREM7IiBkPSJNMTAuMjIxLDIyLjY1NmMwLjE4NC0wLjY4MywwLjgwMy0xLjE1NiwxLjUxLTEuMTU2SDUzdi03SDlsLTYsNnYyMS45NTNMMTAuMjIxLDIyLjY1NnoiLz48cGF0aCBzdHlsZT0iZmlsbDojRUJCQTE2OyIgZD0iTTIzLjU3MSwxMC41TDIwLDUuNUgxLjczMkMwLjc3Niw1LjUsMCw2LjI3NSwwLDcuMjMyVjQ5Ljk2YzAuMDY5LDAuMDAyLDAuMTM4LDAuMDA2LDAuMjA1LDAuMDFMMyw0Mi4zNDlWMjAuNWwyLTJ2LThIMjMuNTcxeiIvPjxwb2x5Z29uIHN0eWxlPSJmaWxsOiNEMUJGODY7IiBwb2ludHM9IjUsMTAuNSA1LDE4LjUgOSwxNC41IDUxLDE0LjUgNTEsMTAuNSAiLz48cmVjdCB4PSIyOCIgeT0iMTkuNSIgc3R5bGU9ImZpbGw6I0JGQkFBNTsiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiLz48cmVjdCB4PSIzNSIgeT0iMTkuNSIgc3R5bGU9ImZpbGw6I0JGQkFBNTsiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiLz48cmVjdCB4PSI0MiIgeT0iMTkuNSIgc3R5bGU9ImZpbGw6I0JGQkFBNTsiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiLz48cmVjdCB4PSIxNCIgeT0iMTkuNSIgc3R5bGU9ImZpbGw6I0JGQkFBNTsiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiLz48cmVjdCB4PSIyMSIgeT0iMTkuNSIgc3R5bGU9ImZpbGw6I0JGQkFBNTsiIHdpZHRoPSIyIiBoZWlnaHQ9IjIiLz48cG9seWdvbiBzdHlsZT0iZmlsbDojQ0VDOUFFOyIgcG9pbnRzPSI5LDIwLjUgOSwxNC41IDMsMjAuNSAiLz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48L3N2Zz4=";
+                        break;
+                    case "jpg":
+                        return "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJDYXBhXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNTYgNTYiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDU2IDU2OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0U5RTlFMDsiIGQ9Ik0zNi45ODUsMEg3Ljk2M0M3LjE1NSwwLDYuNSwwLjY1NSw2LjUsMS45MjZWNTVjMCwwLjM0NSwwLjY1NSwxLDEuNDYzLDFoNDAuMDc0YzAuODA4LDAsMS40NjMtMC42NTUsMS40NjMtMVYxMi45NzhjMC0wLjY5Ni0wLjA5My0wLjkyLTAuMjU3LTEuMDg1TDM3LjYwNywwLjI1N0MzNy40NDIsMC4wOTMsMzcuMjE4LDAsMzYuOTg1LDB6Ii8+PHBvbHlnb24gc3R5bGU9ImZpbGw6I0Q5RDdDQTsiIHBvaW50cz0iMzcuNSwwLjE1MSAzNy41LDEyIDQ5LjM0OSwxMiAiLz48Y2lyY2xlIHN0eWxlPSJmaWxsOiNGM0Q1NUI7IiBjeD0iMTguOTMxIiBjeT0iMTQuNDMxIiByPSI0LjU2OSIvPjxwb2x5Z29uIHN0eWxlPSJmaWxsOiMyNkI5OUE7IiBwb2ludHM9IjYuNSwzOSAxNy41LDM5IDQ5LjUsMzkgNDkuNSwyOCAzOS41LDE4LjUgMjksMzAgMjMuNTE3LDI0LjUxNyAiLz48cGF0aCBzdHlsZT0iZmlsbDojMTRBMDg1OyIgZD0iTTQ4LjAzNyw1Nkg3Ljk2M0M3LjE1NSw1Niw2LjUsNTUuMzQ1LDYuNSw1NC41MzdWMzloNDN2MTUuNTM3QzQ5LjUsNTUuMzQ1LDQ4Ljg0NSw1Niw0OC4wMzcsNTZ6Ii8+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0yMS40MjYsNDIuNjV2Ny44NDhjMCwwLjQ3NC0wLjA4NywwLjg3My0wLjI2LDEuMTk2Yy0wLjE3MywwLjMyMy0wLjQwNiwwLjU4My0wLjY5NywwLjc3OWMtMC4yOTIsMC4xOTYtMC42MjcsMC4zMzMtMS4wMDUsMC40MUMxOS4wODUsNTIuOTYxLDE4LjY5Niw1MywxOC4yOTUsNTNjLTAuMjAxLDAtMC40MzYtMC4wMjEtMC43MDQtMC4wNjJjLTAuMjY5LTAuMDQxLTAuNTQ3LTAuMTA0LTAuODM0LTAuMTkxcy0wLjU2My0wLjE4NS0wLjgyNy0wLjI5NGMtMC4yNjUtMC4xMDktMC40ODgtMC4yMzItMC42Ny0wLjM2OWwwLjY5Ny0xLjEwN2MwLjA5MSwwLjA2MywwLjIyMSwwLjEzLDAuMzksMC4xOThjMC4xNjgsMC4wNjgsMC4zNTMsMC4xMzIsMC41NTQsMC4xOTFjMC4yLDAuMDYsMC40MSwwLjExMSwwLjYyOSwwLjE1N3MwLjQyNCwwLjA2OCwwLjYxNSwwLjA2OGMwLjQ4MywwLDAuODY4LTAuMDk0LDEuMTU1LTAuMjhzMC40MzktMC41MDQsMC40NTgtMC45NVY0Mi42NUgyMS40MjZ6Ii8+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0yNS41MTQsNTIuOTMyaC0xLjY0MVY0Mi44NTVoMi44OThjMC40MjgsMCwwLjg1MiwwLjA2OCwxLjI3MSwwLjIwNWMwLjQxOSwwLjEzNywwLjc5NSwwLjM0MiwxLjEyOCwwLjYxNWMwLjMzMywwLjI3MywwLjYwMiwwLjYwNCwwLjgwNywwLjk5MXMwLjMwOCwwLjgyMiwwLjMwOCwxLjMwNmMwLDAuNTExLTAuMDg3LDAuOTczLTAuMjYsMS4zODhjLTAuMTczLDAuNDE1LTAuNDE1LDAuNzY0LTAuNzI1LDEuMDQ2Yy0wLjMxLDAuMjgyLTAuNjg0LDAuNTAxLTEuMTIxLDAuNjU2cy0wLjkyMSwwLjIzMi0xLjQ0OSwwLjIzMmgtMS4yMTdWNTIuOTMyeiBNMjUuNTE0LDQ0LjF2My45OTJoMS41MDRjMC4yLDAsMC4zOTgtMC4wMzQsMC41OTUtMC4xMDNjMC4xOTYtMC4wNjgsMC4zNzYtMC4xOCwwLjU0LTAuMzM1czAuMjk2LTAuMzcxLDAuMzk2LTAuNjQ5YzAuMS0wLjI3OCwwLjE1LTAuNjIyLDAuMTUtMS4wMzJjMC0wLjE2NC0wLjAyMy0wLjM1NC0wLjA2OC0wLjU2N2MtMC4wNDYtMC4yMTQtMC4xMzktMC40MTktMC4yOC0wLjYxNWMtMC4xNDItMC4xOTYtMC4zNC0wLjM2LTAuNTk1LTAuNDkyQzI3LjUsNDQuMTY2LDI3LjE2Myw0NC4xLDI2Ljc0NCw0NC4xSDI1LjUxNHoiLz48cGF0aCBzdHlsZT0iZmlsbDojRkZGRkZGOyIgZD0iTTM5LjUsNDcuNzM2djMuODk2Yy0wLjIxLDAuMjY1LTAuNDQ0LDAuNDgtMC43MDQsMC42NDlzLTAuNTMzLDAuMzA4LTAuODIsMC40MTdzLTAuNTgzLDAuMTg3LTAuODg5LDAuMjMyQzM2Ljc4MSw1Mi45NzgsMzYuNDc5LDUzLDM2LjE3OCw1M2MtMC42MDIsMC0xLjE1NS0wLjEwOS0xLjY2MS0wLjMyOHMtMC45NDgtMC41NDItMS4zMjYtMC45NzFjLTAuMzc4LTAuNDI5LTAuNjc1LTAuOTY2LTAuODg5LTEuNjEzYy0wLjIxNC0wLjY0Ny0wLjMyMS0xLjM5NS0wLjMyMS0yLjI0MnMwLjEwNy0xLjU5MywwLjMyMS0yLjIzNWMwLjIxNC0wLjY0MywwLjUxLTEuMTc4LDAuODg5LTEuNjA2YzAuMzc4LTAuNDI5LDAuODIyLTAuNzU0LDEuMzMzLTAuOTc4YzAuNTEtMC4yMjQsMS4wNjItMC4zMzUsMS42NTQtMC4zMzVjMC41NDcsMCwxLjA1NywwLjA5MSwxLjUzMSwwLjI3M2MwLjQ3NCwwLjE4MywwLjg5NywwLjQ1NiwxLjI3MSwwLjgybC0xLjEzNSwxLjAxMmMtMC4yMTktMC4yNjUtMC40Ny0wLjQ1Ni0wLjc1Mi0wLjU3NGMtMC4yODMtMC4xMTgtMC41NzQtMC4xNzgtMC44NzUtMC4xNzhjLTAuMzM3LDAtMC42NTksMC4wNjMtMC45NjQsMC4xOTFjLTAuMzA2LDAuMTI4LTAuNTc5LDAuMzQ0LTAuODIsMC42NDljLTAuMjQyLDAuMzA2LTAuNDMxLDAuNjk5LTAuNTY3LDEuMTgzcy0wLjIxLDEuMDc1LTAuMjE5LDEuNzc3YzAuMDA5LDAuNjg0LDAuMDgsMS4yNzYsMC4yMTIsMS43NzdjMC4xMzIsMC41MDEsMC4zMTQsMC45MTEsMC41NDcsMS4yM3MwLjQ5NywwLjU1NiwwLjc5MywwLjcxMWMwLjI5NiwwLjE1NSwwLjYwOCwwLjIzMiwwLjkzNywwLjIzMmMwLjEsMCwwLjIzNC0wLjAwNywwLjQwMy0wLjAyMWMwLjE2OC0wLjAxNCwwLjMzNy0wLjAzNiwwLjUwNi0wLjA2OGMwLjE2OC0wLjAzMiwwLjMzLTAuMDc1LDAuNDg1LTAuMTNjMC4xNTUtMC4wNTUsMC4yNjktMC4xMzIsMC4zNDItMC4yMzJ2LTIuNDg4aC0xLjcwOXYtMS4xMjFIMzkuNXoiLz48L2c+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjwvc3ZnPg==";
+                        break;
+                    case "pdf":
+                        return "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJDYXBhXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNTYgNTYiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDU2IDU2OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0U5RTlFMDsiIGQ9Ik0zNi45ODUsMEg3Ljk2M0M3LjE1NSwwLDYuNSwwLjY1NSw2LjUsMS45MjZWNTVjMCwwLjM0NSwwLjY1NSwxLDEuNDYzLDFoNDAuMDc0YzAuODA4LDAsMS40NjMtMC42NTUsMS40NjMtMVYxMi45NzhjMC0wLjY5Ni0wLjA5My0wLjkyLTAuMjU3LTEuMDg1TDM3LjYwNywwLjI1N0MzNy40NDIsMC4wOTMsMzcuMjE4LDAsMzYuOTg1LDB6Ii8+PHBvbHlnb24gc3R5bGU9ImZpbGw6I0Q5RDdDQTsiIHBvaW50cz0iMzcuNSwwLjE1MSAzNy41LDEyIDQ5LjM0OSwxMiAiLz48cGF0aCBzdHlsZT0iZmlsbDojQ0M0QjRDOyIgZD0iTTE5LjUxNCwzMy4zMjRMMTkuNTE0LDMzLjMyNGMtMC4zNDgsMC0wLjY4Mi0wLjExMy0wLjk2Ny0wLjMyNmMtMS4wNDEtMC43ODEtMS4xODEtMS42NS0xLjExNS0yLjI0MmMwLjE4Mi0xLjYyOCwyLjE5NS0zLjMzMiw1Ljk4NS01LjA2OGMxLjUwNC0zLjI5NiwyLjkzNS03LjM1NywzLjc4OC0xMC43NWMtMC45OTgtMi4xNzItMS45NjgtNC45OS0xLjI2MS02LjY0M2MwLjI0OC0wLjU3OSwwLjU1Ny0xLjAyMywxLjEzNC0xLjIxNWMwLjIyOC0wLjA3NiwwLjgwNC0wLjE3MiwxLjAxNi0wLjE3MmMwLjUwNCwwLDAuOTQ3LDAuNjQ5LDEuMjYxLDEuMDQ5YzAuMjk1LDAuMzc2LDAuOTY0LDEuMTczLTAuMzczLDYuODAyYzEuMzQ4LDIuNzg0LDMuMjU4LDUuNjIsNS4wODgsNy41NjJjMS4zMTEtMC4yMzcsMi40MzktMC4zNTgsMy4zNTgtMC4zNThjMS41NjYsMCwyLjUxNSwwLjM2NSwyLjkwMiwxLjExN2MwLjMyLDAuNjIyLDAuMTg5LDEuMzQ5LTAuMzksMi4xNmMtMC41NTcsMC43NzktMS4zMjUsMS4xOTEtMi4yMiwxLjE5MWMtMS4yMTYsMC0yLjYzMi0wLjc2OC00LjIxMS0yLjI4NWMtMi44MzcsMC41OTMtNi4xNSwxLjY1MS04LjgyOCwyLjgyMmMtMC44MzYsMS43NzQtMS42MzcsMy4yMDMtMi4zODMsNC4yNTFDMjEuMjczLDMyLjY1NCwyMC4zODksMzMuMzI0LDE5LjUxNCwzMy4zMjR6IE0yMi4xNzYsMjguMTk4Yy0yLjEzNywxLjIwMS0zLjAwOCwyLjE4OC0zLjA3MSwyLjc0NGMtMC4wMSwwLjA5Mi0wLjAzNywwLjMzNCwwLjQzMSwwLjY5MkMxOS42ODUsMzEuNTg3LDIwLjU1NSwzMS4xOSwyMi4xNzYsMjguMTk4eiBNMzUuODEzLDIzLjc1NmMwLjgxNSwwLjYyNywxLjAxNCwwLjk0NCwxLjU0NywwLjk0NGMwLjIzNCwwLDAuOTAxLTAuMDEsMS4yMS0wLjQ0MWMwLjE0OS0wLjIwOSwwLjIwNy0wLjM0MywwLjIzLTAuNDE1Yy0wLjEyMy0wLjA2NS0wLjI4Ni0wLjE5Ny0xLjE3NS0wLjE5N0MzNy4xMiwyMy42NDgsMzYuNDg1LDIzLjY3LDM1LjgxMywyMy43NTZ6IE0yOC4zNDMsMTcuMTc0Yy0wLjcxNSwyLjQ3NC0xLjY1OSw1LjE0NS0yLjY3NCw3LjU2NGMyLjA5LTAuODExLDQuMzYyLTEuNTE5LDYuNDk2LTIuMDJDMzAuODE1LDIxLjE1LDI5LjQ2NiwxOS4xOTIsMjguMzQzLDE3LjE3NHogTTI3LjczNiw4LjcxMmMtMC4wOTgsMC4wMzMtMS4zMywxLjc1NywwLjA5NiwzLjIxNkMyOC43ODEsOS44MTMsMjcuNzc5LDguNjk4LDI3LjczNiw4LjcxMnoiLz48cGF0aCBzdHlsZT0iZmlsbDojQ0M0QjRDOyIgZD0iTTQ4LjAzNyw1Nkg3Ljk2M0M3LjE1NSw1Niw2LjUsNTUuMzQ1LDYuNSw1NC41MzdWMzloNDN2MTUuNTM3QzQ5LjUsNTUuMzQ1LDQ4Ljg0NSw1Niw0OC4wMzcsNTZ6Ii8+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0xNy4zODUsNTNoLTEuNjQxVjQyLjkyNGgyLjg5OGMwLjQyOCwwLDAuODUyLDAuMDY4LDEuMjcxLDAuMjA1YzAuNDE5LDAuMTM3LDAuNzk1LDAuMzQyLDEuMTI4LDAuNjE1YzAuMzMzLDAuMjczLDAuNjAyLDAuNjA0LDAuODA3LDAuOTkxczAuMzA4LDAuODIyLDAuMzA4LDEuMzA2YzAsMC41MTEtMC4wODcsMC45NzMtMC4yNiwxLjM4OGMtMC4xNzMsMC40MTUtMC40MTUsMC43NjQtMC43MjUsMS4wNDZjLTAuMzEsMC4yODItMC42ODQsMC41MDEtMS4xMjEsMC42NTZzLTAuOTIxLDAuMjMyLTEuNDQ5LDAuMjMyaC0xLjIxN1Y1M3ogTTE3LjM4NSw0NC4xNjh2My45OTJoMS41MDRjMC4yLDAsMC4zOTgtMC4wMzQsMC41OTUtMC4xMDNjMC4xOTYtMC4wNjgsMC4zNzYtMC4xOCwwLjU0LTAuMzM1YzAuMTY0LTAuMTU1LDAuMjk2LTAuMzcxLDAuMzk2LTAuNjQ5YzAuMS0wLjI3OCwwLjE1LTAuNjIyLDAuMTUtMS4wMzJjMC0wLjE2NC0wLjAyMy0wLjM1NC0wLjA2OC0wLjU2N2MtMC4wNDYtMC4yMTQtMC4xMzktMC40MTktMC4yOC0wLjYxNWMtMC4xNDItMC4xOTYtMC4zNC0wLjM2LTAuNTk1LTAuNDkyYy0wLjI1NS0wLjEzMi0wLjU5My0wLjE5OC0xLjAxMi0wLjE5OEgxNy4zODV6Ii8+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0zMi4yMTksNDcuNjgyYzAsMC44MjktMC4wODksMS41MzgtMC4yNjcsMi4xMjZzLTAuNDAzLDEuMDgtMC42NzcsMS40NzdzLTAuNTgxLDAuNzA5LTAuOTIzLDAuOTM3cy0wLjY3MiwwLjM5OC0wLjk5MSwwLjUxM2MtMC4zMTksMC4xMTQtMC42MTEsMC4xODctMC44NzUsMC4yMTlDMjguMjIyLDUyLjk4NCwyOC4wMjYsNTMsMjcuODk4LDUzaC0zLjgxNFY0Mi45MjRoMy4wMzVjMC44NDgsMCwxLjU5MywwLjEzNSwyLjIzNSwwLjQwM3MxLjE3NiwwLjYyNywxLjYsMS4wNzNzMC43NCwwLjk1NSwwLjk1LDEuNTI0QzMyLjExNCw0Ni40OTQsMzIuMjE5LDQ3LjA4LDMyLjIxOSw0Ny42ODJ6IE0yNy4zNTIsNTEuNzk3YzEuMTEyLDAsMS45MTQtMC4zNTUsMi40MDYtMS4wNjZzMC43MzgtMS43NDEsMC43MzgtMy4wOWMwLTAuNDE5LTAuMDUtMC44MzQtMC4xNS0xLjI0NGMtMC4xMDEtMC40MS0wLjI5NC0wLjc4MS0wLjU4MS0xLjExNHMtMC42NzctMC42MDItMS4xNjktMC44MDdzLTEuMTMtMC4zMDgtMS45MTQtMC4zMDhoLTAuOTU3djcuNjI5SDI3LjM1MnoiLz48cGF0aCBzdHlsZT0iZmlsbDojRkZGRkZGOyIgZD0iTTM2LjI2Niw0NC4xNjh2My4xNzJoNC4yMTF2MS4xMjFoLTQuMjExVjUzaC0xLjY2OFY0Mi45MjRINDAuOXYxLjI0NEgzNi4yNjZ6Ii8+PC9nPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48L3N2Zz4=";
+                        break;
+                    case "png":
+                        return "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJDYXBhXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNTYgNTYiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDU2IDU2OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0U5RTlFMDsiIGQ9Ik0zNi45ODUsMEg3Ljk2M0M3LjE1NSwwLDYuNSwwLjY1NSw2LjUsMS45MjZWNTVjMCwwLjM0NSwwLjY1NSwxLDEuNDYzLDFoNDAuMDc0YzAuODA4LDAsMS40NjMtMC42NTUsMS40NjMtMVYxMi45NzhjMC0wLjY5Ni0wLjA5My0wLjkyLTAuMjU3LTEuMDg1TDM3LjYwNywwLjI1N0MzNy40NDIsMC4wOTMsMzcuMjE4LDAsMzYuOTg1LDB6Ii8+PHBhdGggc3R5bGU9ImZpbGw6IzY1OUMzNTsiIGQ9Ik00OC4wMzcsNTZINy45NjNDNy4xNTUsNTYsNi41LDU1LjM0NSw2LjUsNTQuNTM3VjM5aDQzdjE1LjUzN0M0OS41LDU1LjM0NSw0OC44NDUsNTYsNDguMDM3LDU2eiIvPjxwb2x5Z29uIHN0eWxlPSJmaWxsOiNEOUQ3Q0E7IiBwb2ludHM9IjM3LjUsMC4xNTEgMzcuNSwxMiA0OS4zNDksMTIgIi8+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0xNy4zODUsNTNoLTEuNjQxVjQyLjkyNGgyLjg5OGMwLjQyOCwwLDAuODUyLDAuMDY4LDEuMjcxLDAuMjA1YzAuNDE5LDAuMTM3LDAuNzk1LDAuMzQyLDEuMTI4LDAuNjE1YzAuMzMzLDAuMjczLDAuNjAyLDAuNjA0LDAuODA3LDAuOTkxczAuMzA4LDAuODIyLDAuMzA4LDEuMzA2YzAsMC41MTEtMC4wODcsMC45NzMtMC4yNiwxLjM4OGMtMC4xNzMsMC40MTUtMC40MTUsMC43NjQtMC43MjUsMS4wNDZjLTAuMzEsMC4yODItMC42ODQsMC41MDEtMS4xMjEsMC42NTZzLTAuOTIxLDAuMjMyLTEuNDQ5LDAuMjMyaC0xLjIxN1Y1M3ogTTE3LjM4NSw0NC4xNjh2My45OTJoMS41MDRjMC4yLDAsMC4zOTgtMC4wMzQsMC41OTUtMC4xMDNjMC4xOTYtMC4wNjgsMC4zNzYtMC4xOCwwLjU0LTAuMzM1YzAuMTY0LTAuMTU1LDAuMjk2LTAuMzcxLDAuMzk2LTAuNjQ5YzAuMS0wLjI3OCwwLjE1LTAuNjIyLDAuMTUtMS4wMzJjMC0wLjE2NC0wLjAyMy0wLjM1NC0wLjA2OC0wLjU2N2MtMC4wNDYtMC4yMTQtMC4xMzktMC40MTktMC4yOC0wLjYxNWMtMC4xNDItMC4xOTYtMC4zNC0wLjM2LTAuNTk1LTAuNDkyYy0wLjI1NS0wLjEzMi0wLjU5My0wLjE5OC0xLjAxMi0wLjE5OEgxNy4zODV6Ii8+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0zMS4zMTYsNDIuOTI0VjUzaC0xLjY2OGwtMy45NTEtNi45NDVWNTNoLTEuNjY4VjQyLjkyNGgxLjY2OGwzLjk1MSw2Ljk0NXYtNi45NDVIMzEuMzE2eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiNGRkZGRkY7IiBkPSJNNDEuMTYsNDcuODA1djMuODk2Yy0wLjIxLDAuMjY1LTAuNDQ0LDAuNDgtMC43MDQsMC42NDlzLTAuNTMzLDAuMzA4LTAuODIsMC40MTdTMzkuMDUyLDUyLjk1NCwzOC43NDcsNTNjLTAuMzA2LDAuMDQ2LTAuNjA4LDAuMDY4LTAuOTA5LDAuMDY4Yy0wLjYwMiwwLTEuMTU1LTAuMTA5LTEuNjYxLTAuMzI4cy0wLjk0OC0wLjU0Mi0xLjMyNi0wLjk3MWMtMC4zNzgtMC40MjktMC42NzUtMC45NjYtMC44ODktMS42MTNjLTAuMjE0LTAuNjQ3LTAuMzIxLTEuMzk1LTAuMzIxLTIuMjQyczAuMTA3LTEuNTkzLDAuMzIxLTIuMjM1YzAuMjE0LTAuNjQzLDAuNTEtMS4xNzgsMC44ODktMS42MDZjMC4zNzgtMC40MjksMC44MjItMC43NTQsMS4zMzMtMC45NzhjMC41MS0wLjIyNCwxLjA2Mi0wLjMzNSwxLjY1NC0wLjMzNWMwLjU0NywwLDEuMDU3LDAuMDkxLDEuNTMxLDAuMjczYzAuNDc0LDAuMTgzLDAuODk3LDAuNDU2LDEuMjcxLDAuODJsLTEuMTM1LDEuMDEyYy0wLjIxOS0wLjI2NS0wLjQ3LTAuNDU2LTAuNzUyLTAuNTc0Yy0wLjI4My0wLjExOC0wLjU3NC0wLjE3OC0wLjg3NS0wLjE3OGMtMC4zMzcsMC0wLjY1OSwwLjA2My0wLjk2NCwwLjE5MWMtMC4zMDYsMC4xMjgtMC41NzksMC4zNDQtMC44MiwwLjY0OWMtMC4yNDIsMC4zMDYtMC40MzEsMC42OTktMC41NjcsMS4xODNzLTAuMjEsMS4wNzUtMC4yMTksMS43NzdjMC4wMDksMC42ODQsMC4wOCwxLjI3NiwwLjIxMiwxLjc3N2MwLjEzMiwwLjUwMSwwLjMxNCwwLjkxMSwwLjU0NywxLjIzczAuNDk3LDAuNTU2LDAuNzkzLDAuNzExYzAuMjk2LDAuMTU1LDAuNjA4LDAuMjMyLDAuOTM3LDAuMjMyYzAuMSwwLDAuMjM0LTAuMDA3LDAuNDAzLTAuMDIxYzAuMTY4LTAuMDE0LDAuMzM3LTAuMDM2LDAuNTA2LTAuMDY4YzAuMTY4LTAuMDMyLDAuMzMtMC4wNzUsMC40ODUtMC4xM2MwLjE1NS0wLjA1NSwwLjI2OS0wLjEzMiwwLjM0Mi0wLjIzMnYtMi40ODhoLTEuNzA5di0xLjEyMUg0MS4xNnoiLz48L2c+PGNpcmNsZSBzdHlsZT0iZmlsbDojRjNENTVCOyIgY3g9IjE4LjkzMSIgY3k9IjE0LjQzMSIgcj0iNC41NjkiLz48cG9seWdvbiBzdHlsZT0iZmlsbDojODhDMDU3OyIgcG9pbnRzPSI2LjUsMzkgMTcuNSwzOSA0OS41LDM5IDQ5LjUsMjggMzkuNSwxOC41IDI5LDMwIDIzLjUxNywyNC41MTcgIi8+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjwvc3ZnPg==";
+                        break;
+                    case "ppt":
+                    case "pptx":
+                        return "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJDYXBhXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNTYgNTYiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDU2IDU2OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0U5RTlFMDsiIGQ9Ik0zNi45ODUsMEg3Ljk2M0M3LjE1NSwwLDYuNSwwLjY1NSw2LjUsMS45MjZWNTVjMCwwLjM0NSwwLjY1NSwxLDEuNDYzLDFoNDAuMDc0YzAuODA4LDAsMS40NjMtMC42NTUsMS40NjMtMVYxMi45NzhjMC0wLjY5Ni0wLjA5My0wLjkyLTAuMjU3LTEuMDg1TDM3LjYwNywwLjI1N0MzNy40NDIsMC4wOTMsMzcuMjE4LDAsMzYuOTg1LDB6Ii8+PHBvbHlnb24gc3R5bGU9ImZpbGw6I0Q5RDdDQTsiIHBvaW50cz0iMzcuNSwwLjE1MSAzNy41LDEyIDQ5LjM0OSwxMiAiLz48cGF0aCBzdHlsZT0iZmlsbDojRjY3MTJFOyIgZD0iTTQ4LjAzNyw1Nkg3Ljk2M0M3LjE1NSw1Niw2LjUsNTUuMzQ1LDYuNSw1NC41MzdWMzloNDN2MTUuNTM3QzQ5LjUsNTUuMzQ1LDQ4Ljg0NSw1Niw0OC4wMzcsNTZ6Ii8+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0xNy41ODEsNTNIMTUuOTRWNDIuOTI0aDIuODk4YzAuNDI4LDAsMC44NTIsMC4wNjgsMS4yNzEsMC4yMDVjMC40MTksMC4xMzcsMC43OTUsMC4zNDIsMS4xMjgsMC42MTVjMC4zMzMsMC4yNzMsMC42MDIsMC42MDQsMC44MDcsMC45OTFzMC4zMDgsMC44MjIsMC4zMDgsMS4zMDZjMCwwLjUxMS0wLjA4NywwLjk3My0wLjI2LDEuMzg4Yy0wLjE3MywwLjQxNS0wLjQxNSwwLjc2NC0wLjcyNSwxLjA0NmMtMC4zMSwwLjI4Mi0wLjY4NCwwLjUwMS0xLjEyMSwwLjY1NnMtMC45MjEsMC4yMzItMS40NDksMC4yMzJoLTEuMjE3VjUzeiBNMTcuNTgxLDQ0LjE2OHYzLjk5MmgxLjUwNGMwLjIsMCwwLjM5OC0wLjAzNCwwLjU5NS0wLjEwM2MwLjE5Ni0wLjA2OCwwLjM3Ni0wLjE4LDAuNTQtMC4zMzVzMC4yOTYtMC4zNzEsMC4zOTYtMC42NDljMC4xLTAuMjc4LDAuMTUtMC42MjIsMC4xNS0xLjAzMmMwLTAuMTY0LTAuMDIzLTAuMzU0LTAuMDY4LTAuNTY3Yy0wLjA0Ni0wLjIxNC0wLjEzOS0wLjQxOS0wLjI4LTAuNjE1Yy0wLjE0Mi0wLjE5Ni0wLjM0LTAuMzYtMC41OTUtMC40OTJjLTAuMjU1LTAuMTMyLTAuNTkzLTAuMTk4LTEuMDEyLTAuMTk4SDE3LjU4MXoiLz48cGF0aCBzdHlsZT0iZmlsbDojRkZGRkZGOyIgZD0iTTI1Ljg1Myw1M2gtMS42NDFWNDIuOTI0aDIuODk4YzAuNDI4LDAsMC44NTIsMC4wNjgsMS4yNzEsMC4yMDVjMC40MTksMC4xMzcsMC43OTUsMC4zNDIsMS4xMjgsMC42MTVjMC4zMzMsMC4yNzMsMC42MDIsMC42MDQsMC44MDcsMC45OTFzMC4zMDgsMC44MjIsMC4zMDgsMS4zMDZjMCwwLjUxMS0wLjA4NywwLjk3My0wLjI2LDEuMzg4Yy0wLjE3MywwLjQxNS0wLjQxNSwwLjc2NC0wLjcyNSwxLjA0NmMtMC4zMSwwLjI4Mi0wLjY4NCwwLjUwMS0xLjEyMSwwLjY1NnMtMC45MjEsMC4yMzItMS40NDksMC4yMzJoLTEuMjE3VjUzeiBNMjUuODUzLDQ0LjE2OHYzLjk5MmgxLjUwNGMwLjIsMCwwLjM5OC0wLjAzNCwwLjU5NS0wLjEwM2MwLjE5Ni0wLjA2OCwwLjM3Ni0wLjE4LDAuNTQtMC4zMzVzMC4yOTYtMC4zNzEsMC4zOTYtMC42NDljMC4xLTAuMjc4LDAuMTUtMC42MjIsMC4xNS0xLjAzMmMwLTAuMTY0LTAuMDIzLTAuMzU0LTAuMDY4LTAuNTY3Yy0wLjA0Ni0wLjIxNC0wLjEzOS0wLjQxOS0wLjI4LTAuNjE1Yy0wLjE0Mi0wLjE5Ni0wLjM0LTAuMzYtMC41OTUtMC40OTJjLTAuMjU1LTAuMTMyLTAuNTkzLTAuMTk4LTEuMDEyLTAuMTk4SDI1Ljg1M3oiLz48cGF0aCBzdHlsZT0iZmlsbDojRkZGRkZGOyIgZD0iTTM5LjYwNiw0Mi45MjR2MS4xMjFoLTMuMDA4VjUzaC0xLjY1NHYtOC45NTVoLTMuMDA4di0xLjEyMUgzOS42MDZ6Ii8+PC9nPjxwYXRoIHN0eWxlPSJmaWxsOiNDOEJEQjg7IiBkPSJNMzkuNSwzMGgtMjRWMTRoMjRWMzB6IE0xNy41LDI4aDIwVjE2aC0yMFYyOHoiLz48cGF0aCBzdHlsZT0iZmlsbDojQzhCREI4OyIgZD0iTTIwLjQ5OSwzNWMtMC4xNzUsMC0wLjM1My0wLjA0Ni0wLjUxNC0wLjE0M2MtMC40NzQtMC4yODQtMC42MjctMC44OTgtMC4zNDMtMS4zNzJsMy01YzAuMjg0LTAuNDc0LDAuODk4LTAuNjI3LDEuMzcyLTAuMzQzYzAuNDc0LDAuMjg0LDAuNjI3LDAuODk4LDAuMzQzLDEuMzcybC0zLDVDMjEuMTcsMzQuODI3LDIwLjgzOSwzNSwyMC40OTksMzV6Ii8+PHBhdGggc3R5bGU9ImZpbGw6I0M4QkRCODsiIGQ9Ik0zNC41MDEsMzVjLTAuMzQsMC0wLjY3MS0wLjE3My0wLjg1OC0wLjQ4NWwtMy01Yy0wLjI4NC0wLjQ3NC0wLjEzMS0xLjA4OCwwLjM0My0xLjM3MmMwLjQ3NC0wLjI4MywxLjA4OC0wLjEzMSwxLjM3MiwwLjM0M2wzLDVjMC4yODQsMC40NzQsMC4xMzEsMS4wODgtMC4zNDMsMS4zNzJDMzQuODU0LDM0Ljk1NCwzNC42NzYsMzUsMzQuNTAxLDM1eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiNDOEJEQjg7IiBkPSJNMjcuNSwxNmMtMC41NTIsMC0xLTAuNDQ3LTEtMXYtM2MwLTAuNTUzLDAuNDQ4LTEsMS0xczEsMC40NDcsMSwxdjNDMjguNSwxNS41NTMsMjguMDUyLDE2LDI3LjUsMTZ6Ii8+PHJlY3QgeD0iMTcuNSIgeT0iMTYiIHN0eWxlPSJmaWxsOiNEM0NDQzk7IiB3aWR0aD0iMjAiIGhlaWdodD0iMTIiLz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PC9zdmc+";
+                        break;
+                    case "txt":
+                        return "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJDYXBhXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNTYgNTYiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDU2IDU2OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0U5RTlFMDsiIGQ9Ik0zNi45ODUsMEg3Ljk2M0M3LjE1NSwwLDYuNSwwLjY1NSw2LjUsMS45MjZWNTVjMCwwLjM0NSwwLjY1NSwxLDEuNDYzLDFoNDAuMDc0YzAuODA4LDAsMS40NjMtMC42NTUsMS40NjMtMVYxMi45NzhjMC0wLjY5Ni0wLjA5My0wLjkyLTAuMjU3LTEuMDg1TDM3LjYwNywwLjI1N0MzNy40NDIsMC4wOTMsMzcuMjE4LDAsMzYuOTg1LDB6Ii8+PHBvbHlnb24gc3R5bGU9ImZpbGw6I0Q5RDdDQTsiIHBvaW50cz0iMzcuNSwwLjE1MSAzNy41LDEyIDQ5LjM0OSwxMiAiLz48cGF0aCBzdHlsZT0iZmlsbDojOTVBNUE1OyIgZD0iTTQ4LjAzNyw1Nkg3Ljk2M0M3LjE1NSw1Niw2LjUsNTUuMzQ1LDYuNSw1NC41MzdWMzloNDN2MTUuNTM3QzQ5LjUsNTUuMzQ1LDQ4Ljg0NSw1Niw0OC4wMzcsNTZ6Ii8+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0yMS44NjcsNDIuOTI0djEuMTIxaC0zLjAwOFY1M2gtMS42NTR2LTguOTU1aC0zLjAwOHYtMS4xMjFIMjEuODY3eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiNGRkZGRkY7IiBkPSJNMjguNDQzLDQ4LjEwNUwzMSw1M2gtMS45bC0xLjYtMy44MDFoLTAuMTM3TDI1LjY0MSw1M2gtMS45bDIuNTU3LTQuODk1bC0yLjcyMS01LjE4MmgxLjg3M2wxLjc3Nyw0LjEwMmgwLjEzN2wxLjkyOC00LjEwMmgxLjg3M0wyOC40NDMsNDguMTA1eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiNGRkZGRkY7IiBkPSJNNDAuNTI5LDQyLjkyNHYxLjEyMWgtMy4wMDhWNTNoLTEuNjU0di04Ljk1NWgtMy4wMDh2LTEuMTIxSDQwLjUyOXoiLz48L2c+PHBhdGggc3R5bGU9ImZpbGw6I0M4QkRCODsiIGQ9Ik0xOC41LDEzaC02Yy0wLjU1MywwLTEtMC40NDgtMS0xczAuNDQ3LTEsMS0xaDZjMC41NTMsMCwxLDAuNDQ4LDEsMVMxOS4wNTMsMTMsMTguNSwxM3oiLz48cGF0aCBzdHlsZT0iZmlsbDojQzhCREI4OyIgZD0iTTIxLjUsMThoLTljLTAuNTUzLDAtMS0wLjQ0OC0xLTFzMC40NDctMSwxLTFoOWMwLjU1MywwLDEsMC40NDgsMSwxUzIyLjA1MywxOCwyMS41LDE4eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiNDOEJEQjg7IiBkPSJNMjUuNSwxOGMtMC4yNiwwLTAuNTIxLTAuMTEtMC43MS0wLjI5Yy0wLjE4MS0wLjE5LTAuMjktMC40NC0wLjI5LTAuNzFzMC4xMDktMC41MiwwLjMtMC43MWMwLjM2LTAuMzcsMS4wNC0wLjM3LDEuNDEsMGMwLjE4LDAuMTksMC4yOSwwLjQ1LDAuMjksMC43MWMwLDAuMjYtMC4xMSwwLjUyLTAuMjksMC43MUMyNi4wMiwxNy44OSwyNS43NiwxOCwyNS41LDE4eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiNDOEJEQjg7IiBkPSJNMzcuNSwxOGgtOGMtMC41NTMsMC0xLTAuNDQ4LTEtMXMwLjQ0Ny0xLDEtMWg4YzAuNTUzLDAsMSwwLjQ0OCwxLDFTMzguMDUzLDE4LDM3LjUsMTh6Ii8+PHBhdGggc3R5bGU9ImZpbGw6I0M4QkRCODsiIGQ9Ik0xMi41LDMzYy0wLjI2LDAtMC41MjEtMC4xMS0wLjcxLTAuMjljLTAuMTgxLTAuMTktMC4yOS0wLjQ1LTAuMjktMC43MWMwLTAuMjYsMC4xMDktMC41MiwwLjI5LTAuNzFjMC4zNy0wLjM3LDEuMDUtMC4zNywxLjQyLDAuMDFjMC4xOCwwLjE4LDAuMjksMC40NCwwLjI5LDAuN2MwLDAuMjYtMC4xMSwwLjUyLTAuMjksMC43MUMxMy4wMiwzMi44OSwxMi43NiwzMywxMi41LDMzeiIvPjxwYXRoIHN0eWxlPSJmaWxsOiNDOEJEQjg7IiBkPSJNMjQuNSwzM2gtOGMtMC41NTMsMC0xLTAuNDQ4LTEtMXMwLjQ0Ny0xLDEtMWg4YzAuNTUzLDAsMSwwLjQ0OCwxLDFTMjUuMDUzLDMzLDI0LjUsMzN6Ii8+PHBhdGggc3R5bGU9ImZpbGw6I0M4QkRCODsiIGQ9Ik00My41LDE4aC0yYy0wLjU1MywwLTEtMC40NDgtMS0xczAuNDQ3LTEsMS0xaDJjMC41NTMsMCwxLDAuNDQ4LDEsMVM0NC4wNTMsMTgsNDMuNSwxOHoiLz48cGF0aCBzdHlsZT0iZmlsbDojQzhCREI4OyIgZD0iTTM0LjUsMjNoLTIyYy0wLjU1MywwLTEtMC40NDgtMS0xczAuNDQ3LTEsMS0xaDIyYzAuNTUzLDAsMSwwLjQ0OCwxLDFTMzUuMDUzLDIzLDM0LjUsMjN6Ii8+PHBhdGggc3R5bGU9ImZpbGw6I0M4QkRCODsiIGQ9Ik00My41LDIzaC02Yy0wLjU1MywwLTEtMC40NDgtMS0xczAuNDQ3LTEsMS0xaDZjMC41NTMsMCwxLDAuNDQ4LDEsMVM0NC4wNTMsMjMsNDMuNSwyM3oiLz48cGF0aCBzdHlsZT0iZmlsbDojQzhCREI4OyIgZD0iTTE2LjUsMjhoLTRjLTAuNTUzLDAtMS0wLjQ0OC0xLTFzMC40NDctMSwxLTFoNGMwLjU1MywwLDEsMC40NDgsMSwxUzE3LjA1MywyOCwxNi41LDI4eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiNDOEJEQjg7IiBkPSJNMzAuNSwyOGgtMTBjLTAuNTUzLDAtMS0wLjQ0OC0xLTFzMC40NDctMSwxLTFoMTBjMC41NTMsMCwxLDAuNDQ4LDEsMVMzMS4wNTMsMjgsMzAuNSwyOHoiLz48cGF0aCBzdHlsZT0iZmlsbDojQzhCREI4OyIgZD0iTTQzLjUsMjhoLTljLTAuNTUzLDAtMS0wLjQ0OC0xLTFzMC40NDctMSwxLTFoOWMwLjU1MywwLDEsMC40NDgsMSwxUzQ0LjA1MywyOCw0My41LDI4eiIvPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48L3N2Zz4=";
+                        break;
+                    case "xls":
+                    case "xlsx":
+                    case "ods":
+                        return "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJDYXBhXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNTYgNTYiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDU2IDU2OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0U5RTlFMDsiIGQ9Ik0zNi45ODUsMEg3Ljk2M0M3LjE1NSwwLDYuNSwwLjY1NSw2LjUsMS45MjZWNTVjMCwwLjM0NSwwLjY1NSwxLDEuNDYzLDFoNDAuMDc0YzAuODA4LDAsMS40NjMtMC42NTUsMS40NjMtMVYxMi45NzhjMC0wLjY5Ni0wLjA5My0wLjkyLTAuMjU3LTEuMDg1TDM3LjYwNywwLjI1N0MzNy40NDIsMC4wOTMsMzcuMjE4LDAsMzYuOTg1LDB6Ii8+PHBvbHlnb24gc3R5bGU9ImZpbGw6I0Q5RDdDQTsiIHBvaW50cz0iMzcuNSwwLjE1MSAzNy41LDEyIDQ5LjM0OSwxMiAiLz48cGF0aCBzdHlsZT0iZmlsbDojOTFDREEwOyIgZD0iTTQ4LjAzNyw1Nkg3Ljk2M0M3LjE1NSw1Niw2LjUsNTUuMzQ1LDYuNSw1NC41MzdWMzloNDN2MTUuNTM3QzQ5LjUsNTUuMzQ1LDQ4Ljg0NSw1Niw0OC4wMzcsNTZ6Ii8+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0yMC4zNzksNDguMTA1TDIyLjkzNiw1M2gtMS45bC0xLjYtMy44MDFoLTAuMTM3TDE3LjU3Niw1M2gtMS45bDIuNTU3LTQuODk1bC0yLjcyMS01LjE4MmgxLjg3M2wxLjc3Nyw0LjEwMmgwLjEzN2wxLjkyOC00LjEwMkgyMy4xTDIwLjM3OSw0OC4xMDV6Ii8+PHBhdGggc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGQ9Ik0yNy4wMzcsNDIuOTI0djguODMyaDQuNjM1VjUzaC02LjMwM1Y0Mi45MjRIMjcuMDM3eiIvPjxwYXRoIHN0eWxlPSJmaWxsOiNGRkZGRkY7IiBkPSJNMzkuMDQxLDUwLjIzOGMwLDAuMzY0LTAuMDc1LDAuNzE4LTAuMjI2LDEuMDZTMzguNDUzLDUxLjk0LDM4LjE4LDUyLjJzLTAuNjExLDAuNDY3LTEuMDEyLDAuNjIyYy0wLjQwMSwwLjE1NS0wLjg1NywwLjIzMi0xLjM2NywwLjIzMmMtMC4yMTksMC0wLjQ0NC0wLjAxMi0wLjY3Ny0wLjAzNHMtMC40NjctMC4wNjItMC43MDQtMC4xMTZjLTAuMjM3LTAuMDU1LTAuNDYzLTAuMTMtMC42NzctMC4yMjZjLTAuMjE0LTAuMDk2LTAuMzk5LTAuMjEyLTAuNTU0LTAuMzQ5bDAuMjg3LTEuMTc2YzAuMTI3LDAuMDczLDAuMjg5LDAuMTQ0LDAuNDg1LDAuMjEyYzAuMTk2LDAuMDY4LDAuMzk4LDAuMTMyLDAuNjA4LDAuMTkxYzAuMjA5LDAuMDYsMC40MTksMC4xMDcsMC42MjksMC4xNDRjMC4yMDksMC4wMzYsMC40MDUsMC4wNTUsMC41ODgsMC4wNTVjMC41NTYsMCwwLjk4Mi0wLjEzLDEuMjc4LTAuMzljMC4yOTYtMC4yNiwwLjQ0NC0wLjY0NSwwLjQ0NC0xLjE1NWMwLTAuMzEtMC4xMDUtMC41NzQtMC4zMTQtMC43OTNjLTAuMjEtMC4yMTktMC40NzItMC40MTctMC43ODYtMC41OTVzLTAuNjU0LTAuMzU1LTEuMDE5LTAuNTMzYy0wLjM2NS0wLjE3OC0wLjcwNy0wLjM4OC0xLjAyNS0wLjYyOWMtMC4zMTktMC4yNDEtMC41ODMtMC41MjYtMC43OTMtMC44NTRjLTAuMjEtMC4zMjgtMC4zMTQtMC43MzgtMC4zMTQtMS4yM2MwLTAuNDQ2LDAuMDgyLTAuODQzLDAuMjQ2LTEuMTg5czAuMzg1LTAuNjQxLDAuNjYzLTAuODgyYzAuMjc4LTAuMjQxLDAuNjAyLTAuNDI2LDAuOTcxLTAuNTU0czAuNzU5LTAuMTkxLDEuMTY5LTAuMTkxYzAuNDE5LDAsMC44NDMsMC4wMzksMS4yNzEsMC4xMTZjMC40MjgsMC4wNzcsMC43NzQsMC4yMDMsMS4wMzksMC4zNzZjLTAuMDU1LDAuMTE4LTAuMTE5LDAuMjQ4LTAuMTkxLDAuMzljLTAuMDczLDAuMTQyLTAuMTQyLDAuMjczLTAuMjA1LDAuMzk2Yy0wLjA2NCwwLjEyMy0wLjExOSwwLjIyNi0wLjE2NCwwLjMwOGMtMC4wNDYsMC4wODItMC4wNzMsMC4xMjgtMC4wODIsMC4xMzdjLTAuMDU1LTAuMDI3LTAuMTE2LTAuMDYzLTAuMTg1LTAuMTA5cy0wLjE2Ny0wLjA5MS0wLjI5NC0wLjEzN2MtMC4xMjgtMC4wNDYtMC4yOTYtMC4wNzctMC41MDYtMC4wOTZjLTAuMjEtMC4wMTktMC40NzktMC4wMTQtMC44MDcsMC4wMTRjLTAuMTgzLDAuMDE5LTAuMzU1LDAuMDctMC41MiwwLjE1N3MtMC4zMSwwLjE5My0wLjQzOCwwLjMyMWMtMC4xMjgsMC4xMjgtMC4yMjgsMC4yNzEtMC4zMDEsMC40MzFjLTAuMDczLDAuMTU5LTAuMTA5LDAuMzEzLTAuMTA5LDAuNDU4YzAsMC4zNjQsMC4xMDQsMC42NTgsMC4zMTQsMC44ODJjMC4yMDksMC4yMjQsMC40NjksMC40MTksMC43NzksMC41ODhjMC4zMSwwLjE2OSwwLjY0NywwLjMzMywxLjAxMiwwLjQ5MmMwLjM2NCwwLjE1OSwwLjcwNCwwLjM1NCwxLjAxOSwwLjU4MXMwLjU3NiwwLjUxMywwLjc4NiwwLjg1NEMzOC45MzYsNDkuMjYxLDM5LjA0MSw0OS43LDM5LjA0MSw1MC4yMzh6Ii8+PC9nPjxwYXRoIHN0eWxlPSJmaWxsOiNDOEJEQjg7IiBkPSJNMjMuNSwxNnYtNGgtMTJ2NHYydjJ2MnYydjJ2MnYydjRoMTBoMmgyMXYtNHYtMnYtMnYtMnYtMnYtMnYtNEgyMy41eiBNMTMuNSwxNGg4djJoLThWMTR6IE0xMy41LDE4aDh2MmgtOFYxOHogTTEzLjUsMjJoOHYyaC04VjIyeiBNMTMuNSwyNmg4djJoLThWMjZ6IE0yMS41LDMyaC04di0yaDhWMzJ6IE00Mi41LDMyaC0xOXYtMmgxOVYzMnogTTQyLjUsMjhoLTE5di0yaDE5VjI4eiBNNDIuNSwyNGgtMTl2LTJoMTlWMjR6IE0yMy41LDIwdi0yaDE5djJIMjMuNXoiLz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PC9zdmc+";
+                        break;
+                    default:
+                    case "file":
+                        return "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iaXNvLTg4NTktMSI/PjwhRE9DVFlQRSBzdmcgUFVCTElDICItLy9XM0MvL0RURCBTVkcgMS4xLy9FTiIgImh0dHA6Ly93d3cudzMub3JnL0dyYXBoaWNzL1NWRy8xLjEvRFREL3N2ZzExLmR0ZCI+PHN2ZyB2ZXJzaW9uPSIxLjEiIGlkPSJDYXBhXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IiB2aWV3Qm94PSIwIDAgNTYgNTYiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDU2IDU2OyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+PGc+PHBhdGggc3R5bGU9ImZpbGw6I0U5RTlFMDsiIGQ9Ik0zNi45ODUsMEg3Ljk2M0M3LjE1NSwwLDYuNSwwLjY1NSw2LjUsMS45MjZWNTVjMCwwLjM0NSwwLjY1NSwxLDEuNDYzLDFoNDAuMDc0YzAuODA4LDAsMS40NjMtMC42NTUsMS40NjMtMVYxMi45NzhjMC0wLjY5Ni0wLjA5My0wLjkyLTAuMjU3LTEuMDg1TDM3LjYwNywwLjI1N0MzNy40NDIsMC4wOTMsMzcuMjE4LDAsMzYuOTg1LDB6Ii8+PHBvbHlnb24gc3R5bGU9ImZpbGw6I0Q5RDdDQTsiIHBvaW50cz0iMzcuNSwwLjE1MSAzNy41LDEyIDQ5LjM0OSwxMiAiLz48cGF0aCBzdHlsZT0iZmlsbDojQzhCREI4OyIgZD0iTTQ4LjAzNyw1Nkg3Ljk2M0M3LjE1NSw1Niw2LjUsNTUuMzQ1LDYuNSw1NC41MzdWMzloNDN2MTUuNTM3QzQ5LjUsNTUuMzQ1LDQ4Ljg0NSw1Niw0OC4wMzcsNTZ6Ii8+PGNpcmNsZSBzdHlsZT0iZmlsbDojRkZGRkZGOyIgY3g9IjE4LjUiIGN5PSI0NyIgcj0iMyIvPjxjaXJjbGUgc3R5bGU9ImZpbGw6I0ZGRkZGRjsiIGN4PSIyOC41IiBjeT0iNDciIHI9IjMiLz48Y2lyY2xlIHN0eWxlPSJmaWxsOiNGRkZGRkY7IiBjeD0iMzguNSIgY3k9IjQ3IiByPSIzIi8+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjxnPjwvZz48Zz48L2c+PGc+PC9nPjwvc3ZnPg==";
+                        break;
+                }
+            }
 
-        // At this point we invoke the callback, which still can disallow the drop.
-        // We can't do this earlier because we want to pass the index of the placeholder.
-        if (attr.dndDragover && !invokeCallback(attr.dndDragover, event, dropEffect, itemType)) {
-          return stopDragover();
-        }
 
-        // Set dropEffect to modify the cursor shown by the browser, unless we're in IE, where this
-        // is not supported. This must be done after preventDefault in Firefox.
-        event.preventDefault();
-        if (!ignoreDataTransfer) {
-          event.dataTransfer.dropEffect = dropEffect;
-        }
+            /**
+             * When the drag operation is started we have to prepare the dataTransfer object,
+             * which is the primary way we communicate with the target element
+             */
+            element.on('dragstart', function (event) {
+                event = event.originalEvent || event;
 
-        element.addClass("dndDragover");
-        event.stopPropagation();
-        return false;
-      });
+                // Check whether the element is draggable, since dragstart might be triggered on a child.
+                if (element.attr('draggable') == 'false') return true;
 
-      /**
-       * When the element is dropped, we use the position of the placeholder element as the
-       * position where we insert the transferred data. This assumes that the list has exactly
-       * one child element per array element.
-       */
-      element.on('drop', function(event) {
-        event = event.originalEvent || event;
+                // Initialize global state.
+                dndState.isDragging = true;
+                dndState.itemType = attr.dndType && scope.$eval(attr.dndType).toLowerCase();
 
-        // Check whether the drop is allowed and determine mime type.
-        var mimeType = getMimeType(event.dataTransfer.types);
-        var itemType = getItemType(mimeType);
-        if (!mimeType || !isDropAllowed(itemType)) return true;
+                // Set the allowed drop effects. See below for special IE handling.
+                dndState.dropEffect = "none";
+                dndState.effectAllowed = attr.dndEffectAllowed || ALL_EFFECTS[0];
+                event.dataTransfer.effectAllowed = dndState.effectAllowed;
 
-        // The default behavior in Firefox is to interpret the dropped element as URL and
-        // forward to it. We want to prevent that even if our drop is aborted.
-        event.preventDefault();
+                // Internet Explorer and Microsoft Edge don't support custom mime types, see design doc:
+                // https://github.com/marceljuenemann/angular-drag-and-drop-lists/wiki/Data-Transfer-Design
+                var item = scope.$eval(attr.dndDraggable);
+                var mimeType = MIME_TYPE + (dndState.itemType ? ('-' + dndState.itemType) : '');
+                try {
+                    event.dataTransfer.setData(mimeType, angular.toJson(item));
+                } catch (e) {
+                    // Setting a custom MIME type did not work, we are probably in IE or Edge.
+                    var data = angular.toJson({item: item, type: dndState.itemType});
+                    try {
+                        event.dataTransfer.setData(EDGE_MIME_TYPE, data);
+                    } catch (e) {
+                        // We are in Internet Explorer and can only use the Text MIME type. Also note that IE
+                        // does not allow changing the cursor in the dragover event, therefore we have to choose
+                        // the one we want to display now by setting effectAllowed.
+                        var effectsAllowed = filterEffects(ALL_EFFECTS, dndState.effectAllowed);
+                        event.dataTransfer.effectAllowed = effectsAllowed[0];
+                        event.dataTransfer.setData(MSIE_MIME_TYPE, data);
+                    }
+                }
 
-        // Unserialize the data that was serialized in dragstart.
-        try {
-          var data = JSON.parse(event.dataTransfer.getData(mimeType));
-        } catch(e) {
-          return stopDragover();
-        }
+                // Add CSS classes. See documentation above.
+                element.addClass("dndDragging");
+                $timeout(function () {
+                    element.addClass("dndDraggingSource");
+                }, 0);
 
-        // Drops with invalid types from external sources might not have been filtered out yet.
-        if (mimeType == MSIE_MIME_TYPE || mimeType == EDGE_MIME_TYPE) {
-          itemType = data.type || undefined;
-          data = data.item;
-          if (!isDropAllowed(itemType)) return stopDragover();
-        }
+                // Invoke dragstart callback and prepare extra callback for dropzone.
+                $parse(attr.dndDragstart)(scope, {event: event});
+                if (attr.dndCallback) {
+                    var callback = $parse(attr.dndCallback);
+                    dndState.callback = function (params) {
+                        return callback(scope, params || {});
+                    };
+                }
 
-        // Special handling for internal IE drops, see dragover handler.
-        var ignoreDataTransfer = mimeType == MSIE_MIME_TYPE;
-        var dropEffect = getDropEffect(event, ignoreDataTransfer);
-        if (dropEffect == 'none') return stopDragover();
+                // Try setting a proper drag image if triggered on a dnd-handle (won't work in IE).
+                if ((event._dndHandle || attr.dndDragVisual) && event.dataTransfer.setDragImage) {
+                    var el = element[0];
 
-        // Invoke the callback, which can transform the transferredObject and even abort the drop.
-        var index = getPlaceholderIndex();
-        if (attr.dndDrop) {
-          data = invokeCallback(attr.dndDrop, event, dropEffect, itemType, index, data);
-          if (!data) return stopDragover();
-        }
+                    if (attr.dndDragVisual) {
+                        var visual = $parse(attr.dndDragVisual)(scope, {event: event});
 
-        // The drop is definitely going to happen now, store the dropEffect.
-        dndState.dropEffect = dropEffect;
-        if (!ignoreDataTransfer) {
-          event.dataTransfer.dropEffect = dropEffect;
-        }
+                        var canvas = document.createElement("canvas");
 
-        // Insert the object into the array, unless dnd-drop took care of that (returned true).
-        if (data !== true) {
-          scope.$apply(function() {
-            scope.$eval(attr.dndList).splice(index, 0, data);
-          });
-        }
-        invokeCallback(attr.dndInserted, event, dropEffect, itemType, index, data);
+                        canvas.width = '80';
+                        canvas.height = '80';
 
-        // Clean up
-        stopDragover();
-        event.stopPropagation();
-        return false;
-      });
+                        var ctx = canvas.getContext("2d");
 
-      /**
-       * We have to remove the placeholder when the element is no longer dragged over our list. The
-       * problem is that the dragleave event is not only fired when the element leaves our list,
-       * but also when it leaves a child element. Therefore, we determine whether the mouse cursor
-       * is still pointing to an element inside the list or not.
-       */
-      element.on('dragleave', function(event) {
-        event = event.originalEvent || event;
+                        max = visual.selected.length - 1;
+                        for (var i = max > 2 ? 2 : max; i >= 0; i--) {
+                            var f = visual.selected[i];
+                            var img = new Image();
+                            img.src = getImageForType(f.isDirectory ? "folder" : f.extension);
+                            ctx.drawImage(img, i * 10, i * 10, 50, 50);
+                        }
 
-        var newTarget = document.elementFromPoint(event.clientX, event.clientY);
-        if (listNode.contains(newTarget) && !event._dndPhShown) {
-          // Signalize to potential parent lists that a placeholder is already shown.
-          event._dndPhShown = true;
-        } else {
-          stopDragover();
-        }
-      });
+                        ctx.beginPath();
+                        ctx.arc(40,10,10,0,2*Math.PI);
+                        ctx.fillStyle = 'red';
+                        ctx.fill();
 
-      /**
-       * Given the types array from the DataTransfer object, returns the first valid mime type.
-       * A type is valid if it starts with MIME_TYPE, or it equals MSIE_MIME_TYPE or EDGE_MIME_TYPE.
-       */
-      function getMimeType(types) {
-        if (!types) return MSIE_MIME_TYPE; // IE 9 workaround.
-        for (var i = 0; i < types.length; i++) {
-          if (types[i] == MSIE_MIME_TYPE || types[i] == EDGE_MIME_TYPE ||
-              types[i].substr(0, MIME_TYPE.length) == MIME_TYPE) {
-            return types[i];
-          }
-        }
-        return null;
-      }
+                        ctx.fillStyle = '#ffffff';
+                        if (visual.total < 10) {
+                            ctx.font = "15px Arial";
+                            ctx.fillText(visual.total,36,15);
+                        } else {
+                            ctx.font = "12px Arial";
+                            ctx.fillText(visual.total,33,14);
+                        }
 
-      /**
-       * Determines the type of the item from the dndState, or from the mime type for items from
-       * external sources. Returns undefined if no item type was set and null if the item type could
-       * not be determined.
-       */
-      function getItemType(mimeType) {
-        if (dndState.isDragging) return dndState.itemType || undefined;
-        if (mimeType == MSIE_MIME_TYPE || mimeType == EDGE_MIME_TYPE) return null;
-        return (mimeType && mimeType.substr(MIME_TYPE.length + 1)) || undefined;
-      }
+                        el = new Image();
+                        el.src = canvas.toDataURL();
+                    }
+                    event.dataTransfer.setDragImage(el, 0, 0);
+                }
 
-      /**
-       * Checks various conditions that must be fulfilled for a drop to be allowed, including the
-       * dnd-allowed-types attribute. If the item Type is unknown (null), the drop will be allowed.
-       */
-      function isDropAllowed(itemType) {
-        if (listSettings.disabled) return false;
-        if (!listSettings.externalSources && !dndState.isDragging) return false;
-        if (!listSettings.allowedTypes || itemType === null) return true;
-        return itemType && listSettings.allowedTypes.indexOf(itemType) != -1;
-      }
+                event.stopPropagation();
+            });
 
-      /**
-       * Determines which drop effect to use for the given event. In Internet Explorer we have to
-       * ignore the effectAllowed field on dataTransfer, since we set a fake value in dragstart.
-       * In those cases we rely on dndState to filter effects. Read the design doc for more details:
-       * https://github.com/marceljuenemann/angular-drag-and-drop-lists/wiki/Data-Transfer-Design
-       */
-      function getDropEffect(event, ignoreDataTransfer) {
-        var effects = ALL_EFFECTS;
-        if (!ignoreDataTransfer) {
-          effects = filterEffects(effects, event.dataTransfer.effectAllowed);
-        }
-        if (dndState.isDragging) {
-          effects = filterEffects(effects, dndState.effectAllowed);
-        }
-        if (attr.dndEffectAllowed) {
-          effects = filterEffects(effects, attr.dndEffectAllowed);
-        }
-        // MacOS automatically filters dataTransfer.effectAllowed depending on the modifier keys,
-        // therefore the following modifier keys will only affect other operating systems.
-        if (!effects.length) {
-          return 'none';
-        } else if (event.ctrlKey && effects.indexOf('copy') != -1) {
-          return 'copy';
-        } else if (event.altKey && effects.indexOf('link') != -1) {
-          return 'link';
-        } else {
-          return effects[0];
-        }
-      }
+            /**
+             * The dragend event is triggered when the element was dropped or when the drag
+             * operation was aborted (e.g. hit escape button). Depending on the executed action
+             * we will invoke the callbacks specified with the dnd-moved or dnd-copied attribute.
+             */
+            element.on('dragend', function (event) {
+                event = event.originalEvent || event;
 
-      /**
-       * Small helper function that cleans up if we aborted a drop.
-       */
-      function stopDragover() {
-        placeholder.remove();
-        element.removeClass("dndDragover");
-        return true;
-      }
+                // Invoke callbacks. Usually we would use event.dataTransfer.dropEffect to determine
+                // the used effect, but Chrome has not implemented that field correctly. On Windows
+                // it always sets it to 'none', while Chrome on Linux sometimes sets it to something
+                // else when it's supposed to send 'none' (drag operation aborted).
+                scope.$apply(function () {
+                    var dropEffect = dndState.dropEffect;
+                    var cb = {copy: 'dndCopied', link: 'dndLinked', move: 'dndMoved', none: 'dndCanceled'};
+                    $parse(attr[cb[dropEffect]])(scope, {event: event});
+                    $parse(attr.dndDragend)(scope, {event: event, dropEffect: dropEffect});
+                });
 
-      /**
-       * Invokes a callback with some interesting parameters and returns the callbacks return value.
-       */
-      function invokeCallback(expression, event, dropEffect, itemType, index, item) {
-        return $parse(expression)(scope, {
-          callback: dndState.callback,
-          dropEffect: dropEffect,
-          event: event,
-          external: !dndState.isDragging,
-          index: index !== undefined ? index : getPlaceholderIndex(),
-          item: item || undefined,
-          type: itemType
-        });
-      }
+                // Clean up
+                dndState.isDragging = false;
+                dndState.callback = undefined;
+                element.removeClass("dndDragging");
+                element.removeClass("dndDraggingSource");
+                event.stopPropagation();
 
-      /**
-       * We use the position of the placeholder node to determine at which position of the array the
-       * object needs to be inserted
-       */
-      function getPlaceholderIndex() {
-        return Array.prototype.indexOf.call(listNode.children, placeholderNode);
-      }
+                // In IE9 it is possible that the timeout from dragstart triggers after the dragend handler.
+                $timeout(function () {
+                    element.removeClass("dndDraggingSource");
+                }, 0);
+            });
 
-      /**
-       * Tries to find a child element that has the dndPlaceholder class set. If none was found, a
-       * new li element is created.
-       */
-      function getPlaceholderElement() {
-        var placeholder;
-        angular.forEach(element.children(), function(childNode) {
-          var child = angular.element(childNode);
-          if (child.hasClass('dndPlaceholder')) {
-            placeholder = child;
-          }
-        });
-        return placeholder || angular.element("<li class='dndPlaceholder'></li>");
-      }
-    };
-  }]);
+            /**
+             * When the element is clicked we invoke the callback function
+             * specified with the dnd-selected attribute.
+             */
+            element.on('click', function (event) {
+                if (!attr.dndSelected) return;
 
-  /**
-   * Use the dnd-nodrag attribute inside of dnd-draggable elements to prevent them from starting
-   * drag operations. This is especially useful if you want to use input elements inside of
-   * dnd-draggable elements or create specific handle elements. Note: This directive does not work
-   * in Internet Explorer 9.
-   */
-  dndLists.directive('dndNodrag', function() {
-    return function(scope, element, attr) {
-      // Set as draggable so that we can cancel the events explicitly
-      element.attr("draggable", "true");
+                event = event.originalEvent || event;
+                scope.$apply(function () {
+                    $parse(attr.dndSelected)(scope, {event: event});
+                });
 
-      /**
-       * Since the element is draggable, the browser's default operation is to drag it on dragstart.
-       * We will prevent that and also stop the event from bubbling up.
-       */
-      element.on('dragstart', function(event) {
-        event = event.originalEvent || event;
+                // Prevent triggering dndSelected in parent elements.
+                event.stopPropagation();
+            });
 
-        if (!event._dndHandle) {
-          // If a child element already reacted to dragstart and set a dataTransfer object, we will
-          // allow that. For example, this is the case for user selections inside of input elements.
-          if (!(event.dataTransfer.types && event.dataTransfer.types.length)) {
-            event.preventDefault();
-          }
-          event.stopPropagation();
-        }
-      });
+            /**
+             * Workaround to make element draggable in IE9
+             */
+            element.on('selectstart', function () {
+                if (this.dragDrop) this.dragDrop();
+            });
+        };
+    }]);
 
-      /**
-       * Stop propagation of dragend events, otherwise dnd-moved might be triggered and the element
-       * would be removed.
-       */
-      element.on('dragend', function(event) {
-        event = event.originalEvent || event;
-        if (!event._dndHandle) {
-          event.stopPropagation();
-        }
-      });
-    };
-  });
+    /**
+     * Use the dnd-list attribute to make your list element a dropzone. Usually you will add a single
+     * li element as child with the ng-repeat directive. If you don't do that, we will not be able to
+     * position the dropped element correctly. If you want your list to be sortable, also add the
+     * dnd-draggable directive to your li element(s).
+     *
+     * Attributes:
+     * - dnd-list             Required attribute. The value has to be the array in which the data of
+     *                        the dropped element should be inserted. The value can be blank if used
+     *                        with a custom dnd-drop handler that always returns true.
+     * - dnd-allowed-types    Optional array of allowed item types. When used, only items that had a
+     *                        matching dnd-type attribute will be dropable. Upper case characters will
+     *                        automatically be converted to lower case.
+     * - dnd-effect-allowed   Optional string expression that limits the drop effects that can be
+     *                        performed in the list. See dnd-effect-allowed on dnd-draggable for more
+     *                        details on allowed options. The default value is all.
+     * - dnd-disable-if       Optional boolean expresssion. When it evaluates to true, no dropping
+     *                        into the list is possible. Note that this also disables rearranging
+     *                        items inside the list.
+     * - dnd-horizontal-list  Optional boolean expresssion. When it evaluates to true, the positioning
+     *                        algorithm will use the left and right halfs of the list items instead of
+     *                        the upper and lower halfs.
+     * - dnd-external-sources Optional boolean expression. When it evaluates to true, the list accepts
+     *                        drops from sources outside of the current browser tab. This allows to
+     *                        drag and drop accross different browser tabs. The only major browser
+     *                        that does not support this is currently Microsoft Edge.
+     *
+     * Callbacks:
+     * - dnd-dragover         Optional expression that is invoked when an element is dragged over the
+     *                        list. If the expression is set, but does not return true, the element is
+     *                        not allowed to be dropped. The following variables will be available:
+     *                        - event: The original dragover event sent by the browser.
+     *                        - index: The position in the list at which the element would be dropped.
+     *                        - type: The dnd-type set on the dnd-draggable, or undefined if non was
+     *                          set. Will be null for drops from external sources in IE and Edge,
+     *                          since we don't know the type in those cases.
+     *                        - dropEffect: One of move, copy or link, see dnd-effect-allowed.
+     *                        - external: Whether the element was dragged from an external source.
+     *                        - callback: If dnd-callback was set on the source element, this is a
+     *                          function reference to the callback. The callback can be invoked with
+     *                          custom variables like this: callback({var1: value1, var2: value2}).
+     *                          The callback will be executed on the scope of the source element. If
+     *                          dnd-external-sources was set and external is true, this callback will
+     *                          not be available.
+     * - dnd-drop             Optional expression that is invoked when an element is dropped on the
+     *                        list. The same variables as for dnd-dragover will be available, with the
+     *                        exception that type is always known and therefore never null. There
+     *                        will also be an item variable, which is the transferred object. The
+     *                        return value determines the further handling of the drop:
+     *                        - falsy: The drop will be canceled and the element won't be inserted.
+     *                        - true: Signalises that the drop is allowed, but the dnd-drop
+     *                          callback already took care of inserting the element.
+     *                        - otherwise: All other return values will be treated as the object to
+     *                          insert into the array. In most cases you want to simply return the
+     *                          item parameter, but there are no restrictions on what you can return.
+     * - dnd-inserted         Optional expression that is invoked after a drop if the element was
+     *                        actually inserted into the list. The same local variables as for
+     *                        dnd-drop will be available. Note that for reorderings inside the same
+     *                        list the old element will still be in the list due to the fact that
+     *                        dnd-moved was not called yet.
+     *
+     * CSS classes:
+     * - dndPlaceholder       When an element is dragged over the list, a new placeholder child
+     *                        element will be added. This element is of type li and has the class
+     *                        dndPlaceholder set. Alternatively, you can define your own placeholder
+     *                        by creating a child element with dndPlaceholder class.
+     * - dndDragover          Will be added to the list while an element is dragged over the list.
+     */
+    dndLists.directive('dndList', ['$parse', function ($parse) {
+        return function (scope, element, attr) {
+            // While an element is dragged over the list, this placeholder element is inserted
+            // at the location where the element would be inserted after dropping.
+            var placeholder = getPlaceholderElement();
+            placeholder.remove();
 
-  /**
-   * Use the dnd-handle directive within a dnd-nodrag element in order to allow dragging with that
-   * element after all. Therefore, by combining dnd-nodrag and dnd-handle you can allow
-   * dnd-draggable elements to only be dragged via specific "handle" elements. Note that Internet
-   * Explorer will show the handle element as drag image instead of the dnd-draggable element. You
-   * can work around this by styling the handle element differently when it is being dragged. Use
-   * the CSS selector .dndDragging:not(.dndDraggingSource) [dnd-handle] for that.
-   */
-  dndLists.directive('dndHandle', function() {
-    return function(scope, element, attr) {
-      element.attr("draggable", "true");
+            var placeholderNode = placeholder[0];
+            var listNode = element[0];
+            var listSettings = {};
 
-      element.on('dragstart dragend', function(event) {
-        event = event.originalEvent || event;
-        event._dndHandle = true;
-      });
-    };
-  });
+            /**
+             * The dragenter event is fired when a dragged element or text selection enters a valid drop
+             * target. According to the spec, we either need to have a dropzone attribute or listen on
+             * dragenter events and call preventDefault(). It should be noted though that no browser seems
+             * to enforce this behaviour.
+             */
+            element.on('dragenter', function (event) {
+                event = event.originalEvent || event;
 
-  /**
-   * Filters an array of drop effects using a HTML5 effectAllowed string.
-   */
-  function filterEffects(effects, effectAllowed) {
-    if (effectAllowed == 'all') return effects;
-    return effects.filter(function(effect) {
-      return effectAllowed.toLowerCase().indexOf(effect) != -1;
+                // Calculate list properties, so that we don't have to repeat this on every dragover event.
+                var types = attr.dndAllowedTypes && scope.$eval(attr.dndAllowedTypes);
+                listSettings = {
+                    allowedTypes: angular.isArray(types) && types.join('|').toLowerCase().split('|'),
+                    disabled: attr.dndDisableIf && scope.$eval(attr.dndDisableIf),
+                    externalSources: attr.dndExternalSources && scope.$eval(attr.dndExternalSources),
+                    horizontal: attr.dndHorizontalList && scope.$eval(attr.dndHorizontalList)
+                };
+
+                var mimeType = getMimeType(event.dataTransfer.types);
+                if (!mimeType || !isDropAllowed(getItemType(mimeType))) return true;
+                event.preventDefault();
+            });
+
+            /**
+             * The dragover event is triggered "every few hundred milliseconds" while an element
+             * is being dragged over our list, or over an child element.
+             */
+            element.on('dragover', function (event) {
+                event = event.originalEvent || event;
+
+                // Check whether the drop is allowed and determine mime type.
+                var mimeType = getMimeType(event.dataTransfer.types);
+                var itemType = getItemType(mimeType);
+                if (!mimeType || !isDropAllowed(itemType)) return true;
+
+                // Make sure the placeholder is shown, which is especially important if the list is empty.
+                if (placeholderNode.parentNode != listNode) {
+                    element.append(placeholder);
+                }
+
+                if (event.target != listNode) {
+                    // Try to find the node direct directly below the list node.
+                    var listItemNode = event.target;
+                    while (listItemNode.parentNode != listNode && listItemNode.parentNode) {
+                        listItemNode = listItemNode.parentNode;
+                    }
+
+                    if (listItemNode.parentNode == listNode && listItemNode != placeholderNode) {
+                        // If the mouse pointer is in the upper half of the list item element,
+                        // we position the placeholder before the list item, otherwise after it.
+                        var rect = listItemNode.getBoundingClientRect();
+                        if (listSettings.horizontal) {
+                            var isFirstHalf = event.clientX < rect.left + rect.width / 2;
+                        } else {
+                            var isFirstHalf = event.clientY < rect.top + rect.height / 2;
+                        }
+                        listNode.insertBefore(placeholderNode,
+                            isFirstHalf ? listItemNode : listItemNode.nextSibling);
+                    }
+                }
+
+                // In IE we set a fake effectAllowed in dragstart to get the correct cursor, we therefore
+                // ignore the effectAllowed passed in dataTransfer. We must also not access dataTransfer for
+                // drops from external sources, as that throws an exception.
+                var ignoreDataTransfer = mimeType == MSIE_MIME_TYPE;
+                var dropEffect = getDropEffect(event, ignoreDataTransfer);
+                if (dropEffect == 'none') return stopDragover();
+
+                // At this point we invoke the callback, which still can disallow the drop.
+                // We can't do this earlier because we want to pass the index of the placeholder.
+                if (attr.dndDragover && !invokeCallback(attr.dndDragover, event, dropEffect, itemType)) {
+                    return stopDragover();
+                }
+
+                // Set dropEffect to modify the cursor shown by the browser, unless we're in IE, where this
+                // is not supported. This must be done after preventDefault in Firefox.
+                event.preventDefault();
+                if (!ignoreDataTransfer) {
+                    event.dataTransfer.dropEffect = dropEffect;
+                }
+
+                element.addClass("dndDragover");
+                event.stopPropagation();
+                return false;
+            });
+
+            /**
+             * When the element is dropped, we use the position of the placeholder element as the
+             * position where we insert the transferred data. This assumes that the list has exactly
+             * one child element per array element.
+             */
+            element.on('drop', function (event) {
+                event = event.originalEvent || event;
+
+                // Check whether the drop is allowed and determine mime type.
+                var mimeType = getMimeType(event.dataTransfer.types);
+                var itemType = getItemType(mimeType);
+                if (!mimeType || !isDropAllowed(itemType)) return true;
+
+                // The default behavior in Firefox is to interpret the dropped element as URL and
+                // forward to it. We want to prevent that even if our drop is aborted.
+                event.preventDefault();
+
+                // Unserialize the data that was serialized in dragstart.
+                try {
+                    var data = JSON.parse(event.dataTransfer.getData(mimeType));
+                } catch (e) {
+                    return stopDragover();
+                }
+
+                // Drops with invalid types from external sources might not have been filtered out yet.
+                if (mimeType == MSIE_MIME_TYPE || mimeType == EDGE_MIME_TYPE) {
+                    itemType = data.type || undefined;
+                    data = data.item;
+                    if (!isDropAllowed(itemType)) return stopDragover();
+                }
+
+                // Special handling for internal IE drops, see dragover handler.
+                var ignoreDataTransfer = mimeType == MSIE_MIME_TYPE;
+                var dropEffect = getDropEffect(event, ignoreDataTransfer);
+                if (dropEffect == 'none') return stopDragover();
+
+                // Invoke the callback, which can transform the transferredObject and even abort the drop.
+                var index = getPlaceholderIndex();
+                if (attr.dndDrop) {
+                    data = invokeCallback(attr.dndDrop, event, dropEffect, itemType, index, data);
+                    if (!data) return stopDragover();
+                }
+
+                // The drop is definitely going to happen now, store the dropEffect.
+                dndState.dropEffect = dropEffect;
+                if (!ignoreDataTransfer) {
+                    event.dataTransfer.dropEffect = dropEffect;
+                }
+
+                // Insert the object into the array, unless dnd-drop took care of that (returned true).
+                if (data !== true) {
+                    scope.$apply(function () {
+                        scope.$eval(attr.dndList).splice(index, 0, data);
+                    });
+                }
+                invokeCallback(attr.dndInserted, event, dropEffect, itemType, index, data);
+
+                // Clean up
+                stopDragover();
+                event.stopPropagation();
+                return false;
+            });
+
+            /**
+             * We have to remove the placeholder when the element is no longer dragged over our list. The
+             * problem is that the dragleave event is not only fired when the element leaves our list,
+             * but also when it leaves a child element. Therefore, we determine whether the mouse cursor
+             * is still pointing to an element inside the list or not.
+             */
+            element.on('dragleave', function (event) {
+                event = event.originalEvent || event;
+
+                var newTarget = document.elementFromPoint(event.clientX, event.clientY);
+                if (listNode.contains(newTarget) && !event._dndPhShown) {
+                    // Signalize to potential parent lists that a placeholder is already shown.
+                    event._dndPhShown = true;
+                } else {
+                    stopDragover();
+                }
+            });
+
+            /**
+             * Given the types array from the DataTransfer object, returns the first valid mime type.
+             * A type is valid if it starts with MIME_TYPE, or it equals MSIE_MIME_TYPE or EDGE_MIME_TYPE.
+             */
+            function getMimeType(types) {
+                if (!types) return MSIE_MIME_TYPE; // IE 9 workaround.
+                for (var i = 0; i < types.length; i++) {
+                    if (types[i] == MSIE_MIME_TYPE || types[i] == EDGE_MIME_TYPE ||
+                        types[i].substr(0, MIME_TYPE.length) == MIME_TYPE) {
+                        return types[i];
+                    }
+                }
+                return null;
+            }
+
+            /**
+             * Determines the type of the item from the dndState, or from the mime type for items from
+             * external sources. Returns undefined if no item type was set and null if the item type could
+             * not be determined.
+             */
+            function getItemType(mimeType) {
+                if (dndState.isDragging) return dndState.itemType || undefined;
+                if (mimeType == MSIE_MIME_TYPE || mimeType == EDGE_MIME_TYPE) return null;
+                return (mimeType && mimeType.substr(MIME_TYPE.length + 1)) || undefined;
+            }
+
+            /**
+             * Checks various conditions that must be fulfilled for a drop to be allowed, including the
+             * dnd-allowed-types attribute. If the item Type is unknown (null), the drop will be allowed.
+             */
+            function isDropAllowed(itemType) {
+                if (listSettings.disabled) return false;
+                if (!listSettings.externalSources && !dndState.isDragging) return false;
+                if (!listSettings.allowedTypes || itemType === null) return true;
+                return itemType && listSettings.allowedTypes.indexOf(itemType) != -1;
+            }
+
+            /**
+             * Determines which drop effect to use for the given event. In Internet Explorer we have to
+             * ignore the effectAllowed field on dataTransfer, since we set a fake value in dragstart.
+             * In those cases we rely on dndState to filter effects. Read the design doc for more details:
+             * https://github.com/marceljuenemann/angular-drag-and-drop-lists/wiki/Data-Transfer-Design
+             */
+            function getDropEffect(event, ignoreDataTransfer) {
+                var effects = ALL_EFFECTS;
+                if (!ignoreDataTransfer) {
+                    effects = filterEffects(effects, event.dataTransfer.effectAllowed);
+                }
+                if (dndState.isDragging) {
+                    effects = filterEffects(effects, dndState.effectAllowed);
+                }
+                if (attr.dndEffectAllowed) {
+                    effects = filterEffects(effects, attr.dndEffectAllowed);
+                }
+                // MacOS automatically filters dataTransfer.effectAllowed depending on the modifier keys,
+                // therefore the following modifier keys will only affect other operating systems.
+                if (!effects.length) {
+                    return 'none';
+                } else if (event.ctrlKey && effects.indexOf('copy') != -1) {
+                    return 'copy';
+                } else if (event.altKey && effects.indexOf('link') != -1) {
+                    return 'link';
+                } else {
+                    return effects[0];
+                }
+            }
+
+            /**
+             * Small helper function that cleans up if we aborted a drop.
+             */
+            function stopDragover() {
+                placeholder.remove();
+                element.removeClass("dndDragover");
+                return true;
+            }
+
+            /**
+             * Invokes a callback with some interesting parameters and returns the callbacks return value.
+             */
+            function invokeCallback(expression, event, dropEffect, itemType, index, item) {
+                return $parse(expression)(scope, {
+                    callback: dndState.callback,
+                    dropEffect: dropEffect,
+                    event: event,
+                    external: !dndState.isDragging,
+                    index: index !== undefined ? index : getPlaceholderIndex(),
+                    item: item || undefined,
+                    type: itemType
+                });
+            }
+
+            /**
+             * We use the position of the placeholder node to determine at which position of the array the
+             * object needs to be inserted
+             */
+            function getPlaceholderIndex() {
+                return Array.prototype.indexOf.call(listNode.children, placeholderNode);
+            }
+
+            /**
+             * Tries to find a child element that has the dndPlaceholder class set. If none was found, a
+             * new li element is created.
+             */
+            function getPlaceholderElement() {
+                var placeholder;
+                angular.forEach(element.children(), function (childNode) {
+                    var child = angular.element(childNode);
+                    if (child.hasClass('dndPlaceholder')) {
+                        placeholder = child;
+                    }
+                });
+                return placeholder || angular.element("<li class='dndPlaceholder'></li>");
+            }
+        };
+    }]);
+
+    /**
+     * Use the dnd-nodrag attribute inside of dnd-draggable elements to prevent them from starting
+     * drag operations. This is especially useful if you want to use input elements inside of
+     * dnd-draggable elements or create specific handle elements. Note: This directive does not work
+     * in Internet Explorer 9.
+     */
+    dndLists.directive('dndNodrag', function () {
+        return function (scope, element, attr) {
+            // Set as draggable so that we can cancel the events explicitly
+            element.attr("draggable", "true");
+
+            /**
+             * Since the element is draggable, the browser's default operation is to drag it on dragstart.
+             * We will prevent that and also stop the event from bubbling up.
+             */
+            element.on('dragstart', function (event) {
+                event = event.originalEvent || event;
+
+                if (!event._dndHandle) {
+                    // If a child element already reacted to dragstart and set a dataTransfer object, we will
+                    // allow that. For example, this is the case for user selections inside of input elements.
+                    if (!(event.dataTransfer.types && event.dataTransfer.types.length)) {
+                        event.preventDefault();
+                    }
+                    event.stopPropagation();
+                }
+            });
+
+            /**
+             * Stop propagation of dragend events, otherwise dnd-moved might be triggered and the element
+             * would be removed.
+             */
+            element.on('dragend', function (event) {
+                event = event.originalEvent || event;
+                if (!event._dndHandle) {
+                    event.stopPropagation();
+                }
+            });
+        };
     });
-  }
 
-  /**
-   * For some features we need to maintain global state. This is done here, with these fields:
-   * - callback: A callback function set at dragstart that is passed to internal dropzone handlers.
-   * - dropEffect: Set in dragstart to "none" and to the actual value in the drop handler. We don't
-   *   rely on the dropEffect passed by the browser, since there are various bugs in Chrome and
-   *   Safari, and Internet Explorer defaults to copy if effectAllowed is copyMove.
-   * - effectAllowed: Set in dragstart based on dnd-effect-allowed. This is needed for IE because
-   *   setting effectAllowed on dataTransfer might result in an undesired cursor.
-   * - isDragging: True between dragstart and dragend. Falsy for drops from external sources.
-   * - itemType: The item type of the dragged element set via dnd-type. This is needed because IE
-   *   and Edge don't support custom mime types that we can use to transfer this information.
-   */
-  var dndState = {};
+    /**
+     * Use the dnd-handle directive within a dnd-nodrag element in order to allow dragging with that
+     * element after all. Therefore, by combining dnd-nodrag and dnd-handle you can allow
+     * dnd-draggable elements to only be dragged via specific "handle" elements. Note that Internet
+     * Explorer will show the handle element as drag image instead of the dnd-draggable element. You
+     * can work around this by styling the handle element differently when it is being dragged. Use
+     * the CSS selector .dndDragging:not(.dndDraggingSource) [dnd-handle] for that.
+     */
+    dndLists.directive('dndHandle', function () {
+        return function (scope, element, attr) {
+            element.attr("draggable", "true");
+
+            element.on('dragstart dragend', function (event) {
+                event = event.originalEvent || event;
+                event._dndHandle = true;
+            });
+        };
+    });
+
+    /**
+     * Filters an array of drop effects using a HTML5 effectAllowed string.
+     */
+    function filterEffects(effects, effectAllowed) {
+        if (effectAllowed == 'all') return effects;
+        return effects.filter(function (effect) {
+            return effectAllowed.toLowerCase().indexOf(effect) != -1;
+        });
+    }
+
+    /**
+     * For some features we need to maintain global state. This is done here, with these fields:
+     * - callback: A callback function set at dragstart that is passed to internal dropzone handlers.
+     * - dropEffect: Set in dragstart to "none" and to the actual value in the drop handler. We don't
+     *   rely on the dropEffect passed by the browser, since there are various bugs in Chrome and
+     *   Safari, and Internet Explorer defaults to copy if effectAllowed is copyMove.
+     * - effectAllowed: Set in dragstart based on dnd-effect-allowed. This is needed for IE because
+     *   setting effectAllowed on dataTransfer might result in an undesired cursor.
+     * - isDragging: True between dragstart and dragend. Falsy for drops from external sources.
+     * - itemType: The item type of the dragged element set via dnd-type. This is needed because IE
+     *   and Edge don't support custom mime types that we can use to transfer this information.
+     */
+    var dndState = {};
 
 })(angular.module('dndLists', []));
